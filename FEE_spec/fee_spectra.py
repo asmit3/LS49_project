@@ -373,26 +373,27 @@ class FEE_spec(object):
     x=1141
     y=slope*x+intercept
     print (x,y)
-    boundary_pixels = []
+    self.boundary_pixels = []
     # Find pixel for 7122 eV
     y=7122
     x=(y-intercept)/slope
     print (x,y)
-    boundary_pixels.append(int(x))
+    self.boundary_pixels.append(int(x))
     # Find bounding pixels for 7122-30 & 7122+30 eV
     y=7092
     x=(y-intercept)/slope
     print (x,y)
     if x > 2000: x=2000
-    boundary_pixels.append(int(x))
+    self.boundary_pixels.append(int(x))
     y=7152
     x=(y-intercept)/slope
     print (x,y)
     if x <100: x=100
-    boundary_pixels.append(int(x))
-    print (boundary_pixels)
+    self.boundary_pixels.append(int(x))
+    print (self.boundary_pixels)
      
     # Store the slope and intercept
+    # 
     self.slope=slope
     self.intercept=intercept
     
@@ -403,8 +404,124 @@ class FEE_spec(object):
       plt.plot(x,y,'*')
       plt.show()
 
-  def get_photon_energy(self, run):
+
+
+  def get_photon_energy_from_evt(self, evt):
     pass 
+
+  def get_center_of_ev_spec(self,fee_spec):
+    numer=0.0
+    denom=0.0
+    # somehow the spectrometer size changed again during the myoglobin runs
+    assert self.slope is not None, 'ev-axis calibration slope is None. please check code '
+    assert self.intercept is not None, 'ev-axis calibtation intercept is None. please check code'
+    ev_axis=[x*self.slope+self.intercept for x in range(2038)]
+    for ii, fee_data in enumerate(fee_spec):
+      numer += float(ev_axis[ii])*fee_data
+      denom += fee_data
+    return numer/denom
+
+  def plot_correlation_ev_ebeam(self):
+
+  # Plot correlation between ebeam data and the eV data. Should be positively correlated
+
+    ebeam_energy=[]
+    fee_energy=[]
+
+    ds = DataSource('exp=mfxls4916:run=%d:smd'%self.run)
+    env = ds.env()
+    fee_spec = AreaDetector('FEE_Spec', env)
+    ebeam = Detector('EBeam')
+    plt.figure()
+    xs=range(2038)
+    scale_factor = self.beam_profile_cs(xs) 
+    ev_axis=[x*self.slope+self.intercept for x in range(2038)]
+    for nevent,evt in enumerate(ds.events()):
+      calib_array = fee_spec.calib(evt)
+      e=ebeam.get(evt)
+      if calib_array is not None and e is not None:
+        data=calib_array[:,:-10].sum(axis=0) - calib_array[25:50, :-10].sum(axis=0)
+        scaled_data=(data-min(data))/(scale_factor)
+        ebeam_energy.append(e.ebeamPhotonEnergy())
+        fee_energy.append(self.get_center_of_ev_spec(scaled_data))
+        if nevent > 2000: break
+    plt.plot(ebeam_energy,fee_energy,'*')
+    print ('correlation coefficient', np.corrcoef(ebeam_energy, fee_energy))
+    plt.xlabel('EBEAM energy')
+    plt.ylabel('FEE weighted central energy')
+    plt.show()
+
+
+  def get_photon_energy(self, run=223, evt=None):
+    ds = DataSource('exp=mfxls4916:run=%d:smd'%run)
+    env = ds.env()
+    fee_spec = AreaDetector('FEE_Spec', env)
+    xs=range(2038)
+    scale_factor=self.beam_profile_cs(xs)
+    ev_axis=[x*self.slope+self.intercept for x in range(2038)]
+    calib_array = fee_spec.calib(evt)
+    if calib_array is not None:
+      data=calib_array[:,:-10].sum(axis=0) - calib_array[25:50, :-10].sum(axis=0)
+      scaled_data=(data-min(data))/(scale_factor)
+      photon_energy=self.get_center_of_ev_spec(scaled_data)
+      return photon_energy
+    return None 
+      
+  def analyze_photon_energy(self, plot=False):
+
+    ds = DataSource('exp=mfxls4916:run=%d:smd'%self.run)
+    env = ds.env()
+    ebeam = Detector('EBeam')
+    fee_spec = AreaDetector('FEE_Spec', env)
+    if plot:
+      fig1=plt.figure()
+      fig2=plt.figure()
+      ax1=fig1.gca()
+      ax2=fig2.gca()
+    ev_axis=[x*self.slope+self.intercept for x in range(2038)]
+    #print max(ev_axis)
+    #print scaled_data.shape
+    for nevent,evt in enumerate(ds.events()):
+      if nevent < 20: continue
+      calib_array = fee_spec.calib(evt)
+      e=ebeam.get(evt)
+      #if e is not None:
+        #print ('EBEAM photon energy = ',e.ebeamPhotonEnergy())
+      if calib_array is not None:
+        data=calib_array[:,:-10].sum(axis=0) - calib_array[25:50, :-10].sum(axis=0)
+        xs=range(2038)
+        scale_factor=self.beam_profile_cs(xs)
+        if plot:
+          ax1.plot(ev_axis,data-min(data))
+          #ax1.plot(ev_axis,np.log10(1+data))
+          #ylim((0,10.0))
+        # scale data properly by beam profile correction factor
+        scaled_data=(data-min(data))/(scale_factor)
+        #scaled_data=data/scale_factor
+        if plot:
+          ax2.plot(ev_axis, scaled_data)
+          #ax2.plot(ev_axis, np.log10(1.0+scaled_data))
+        if e is not None:
+          print ('EBEAM photon energy=',e.ebeamPhotonEnergy(), self.get_center_of_ev_spec(scaled_data))
+        if plot:
+          #xlim((500,1500))
+          #print max(scaled_data)
+          ax1.plot([ev_axis[self.boundary_pixels[0]]]*2,[0,max(data)],'-',linewidth=5, color='yellow', alpha=0.3)
+          ax1.plot([ev_axis[self.boundary_pixels[1]]]*2,[0,max(data)],'-',linewidth=5, color='grey', alpha=0.1)
+          ax1.plot([ev_axis[self.boundary_pixels[2]]]*2,[0,max(data)],'-',linewidth=5, color='grey', alpha=0.1)
+          ax2.plot([ev_axis[self.boundary_pixels[0]]]*2,[0,max(scaled_data)],'-',linewidth=5, color='yellow', alpha=0.3)
+          ax2.plot([ev_axis[self.boundary_pixels[1]]]*2,[0,max(scaled_data)],'-',linewidth=5, color='grey', alpha=0.1)
+          ax2.plot([ev_axis[self.boundary_pixels[2]]]*2,[0,max(scaled_data)],'-',linewidth=5, color='grey', alpha=0.1)
+          ax1.set_xlabel('eV')
+          ax1.set_ylabel('unscaled intensity')
+          ax2.set_xlabel('eV')
+          ax2.set_ylabel('scaled intensity')
+          #ax1.set_ylim((0,8.0))
+          #print ('Calib array shape = ',calib_array.shape)
+
+        if nevent > 50: break
+    if plot:
+      plt.show()
 
   def get_Fe_edge(self, plot=False):
     """ Return the pixel on the FEE spectrometer that is the Fe edge i.e 7112 eV. Using 0-indexing for pixels 
@@ -418,7 +535,11 @@ class FEE_spec(object):
     ds = DataSource('exp=mfxls4916:run=%d:smd'%self.Fe_foil_run)
     env = ds.env()
     fee_spec = AreaDetector('FEE_Spec', env)
-    img_avg = np.zeros((392, 2050),dtype=np.float32)
+    if self.Fe_foil_run==96:
+      img_avg = np.zeros((392, 2050),dtype=np.float32)
+    elif self.Fe_foil_run==143:
+      img_avg = np.zeros((392, 2048),dtype=np.float32)
+      
     count = 0
     max_events=4000 # Just putting a cutoff because sometimes towards the end of a run, ebeam does weird things
     for nevent,evt in enumerate(ds.events()):
@@ -441,7 +562,11 @@ class FEE_spec(object):
     # print out the top 5 indexes; the first one is an outlier at 1660 for run 96
     #print ('Top 5 indexes of Fe-gradient=', list(Fe_gradient_sorted_idx[:5]))
     # !!!!!!!! Take the second one if run 96 !!!!!!!!!!!!!!!!
-    self.Fe_edge_pixel = Fe_gradient_sorted_idx[1]
+    if self.Fe_foil_run==96:
+      self.Fe_edge_pixel = Fe_gradient_sorted_idx[1]
+    elif self.Fe_foil_run==143:
+      self.Fe_edge_pixel = Fe_gradient_sorted_idx[0]
+      
     print ('Fe edge value intensity and pixel value with 0-indexing=', Fe_edge_data[self.Fe_edge_pixel], self.Fe_edge_pixel)
 
     # This is the plot of the spectrometer data
@@ -460,8 +585,18 @@ class FEE_spec(object):
       plt.show()
 
 if __name__ == '__main__':
-  FEE = FEE_spec()
-  FEE.get_Fe_edge(plot=False)
-  #FEE.vignetting_correction_h5(plot=False)
-  #FEE.beam_profile_correction(plot=False)
-  FEE.calibrate_fee_spec(plot=True)
+  if False:
+    FEE = FEE_spec()
+    FEE.get_Fe_edge(plot=False)
+    FEE.vignetting_correction_h5(plot=False)
+    FEE.beam_profile_correction(plot=False)
+    FEE.calibrate_fee_spec(plot=True)
+    from libtbx.easy_pickle import dump
+    dump('FEE.pickle', FEE)
+    exit()
+  if True:
+    from libtbx.easy_pickle import load
+    FEE=load('FEE.pickle')
+    print ('Should be plotting stuff')
+    FEE.analyze_photon_energy(plot=False)
+    FEE.plot_correlation_ev_ebeam()
