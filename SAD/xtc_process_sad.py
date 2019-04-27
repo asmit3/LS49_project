@@ -1049,13 +1049,14 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       else:
         if self.params.LS49.photon_energy_from_FEE:
           from libtbx.easy_pickle import load
-          FEE=load('/reg/d/psdm/mfx/mfxls4916/scratch/asmit/LS49_2019/input/FEE.pickle')
-          photon_energy=FEE.get_photon_energy(run=self.params.input.run_num, evt=evt)
+          FEE=load('/reg/d/psdm/mfx/mfxls4916/scratch/asmit/LS49_2019/input/FEE_r143_v0.pickle')
+          photon_energy=FEE.get_photon_energy(run=self.params.input.run_num, evt=evt, mode='gauss_first_moment')
+          if photon_energy is None:
+            print ("No wavelength from FEE, skipping shot")
+            self.debug_write("no_wavelength_FEE", "skip")
+            return
           print ('LS49_PR', photon_energy)
-          if photon_energy is not None:
-            wavelength=12398.4187/photon_energy
-          else:
-            wavelength = cspad_tbx.evt_wavelength(evt)
+          wavelength=12398.4187/photon_energy
         else:
           wavelength = 12398.4187/self.params.format.cbf.override_energy
 

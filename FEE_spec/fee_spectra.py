@@ -71,6 +71,7 @@ def flag_func(xp, a,comparison='less'):
     return flex.double([0]*len(xp))
 
 def exgaussian(x, a, mu, sigma, tau):
+  """ Exgaussian functional; See https://en.wikipedia.org/wiki/Exponentially_modified_Gaussian_distribution"""
   import scipy.special as sp
   erfc_input=[(mu+(sigma*sigma/tau)-xp)/(math.sqrt(2)*sigma) for xp in x]
   erfc=sp.erfc(erfc_input)
@@ -404,24 +405,39 @@ class FEE_spec(object):
       plt.plot(x,y,'*')
       plt.show()
 
-
-
-  def get_photon_energy_from_evt(self, evt):
-    pass 
-
-  def get_center_of_ev_spec(self,fee_spec):
+  def get_center_of_ev_spec(self,fee_spec, mode='weighted_mean'):
+    """ Function to calculate a single representative photon energy from the FEE spectrometer reading.
+        Various choices available. LCLS for example uses gaussian 1st moment"""
     numer=0.0
     denom=0.0
     # somehow the spectrometer size changed again during the myoglobin runs
     assert self.slope is not None, 'ev-axis calibration slope is None. please check code '
     assert self.intercept is not None, 'ev-axis calibtation intercept is None. please check code'
     ev_axis=[x*self.slope+self.intercept for x in range(2038)]
-    for ii, fee_data in enumerate(fee_spec):
-      numer += float(ev_axis[ii])*fee_data
-      denom += fee_data
-    return numer/denom
+
+    # LCLS uses 1st moment of gaussian fit to spectra to report ebeam. Same concept used here
+    if mode=='gauss_first_moment':
+      y=fee_spec
+      x=range(len(fee_spec))
+      popt,pcov = curve_fit(gaus,x,y,p0=[y.max(),x[np.argmax(y)],fwhm(x,y)/2.355])
+      x_at_first_moment=popt[1]
+      print ('GAUSS_1ST_MOMENT')
+      return x_at_first_moment*self.slope+self.intercept
+
+    # Return photon energy at which FEE reading is maximum.
+    if mode=='max_fee':
+      return ev_axis[np.argmax(fee_spec)]
+
+    # Return weighted mean of photon energy. Weighted by FEE intensity data
+    else:
+      for ii, fee_data in enumerate(fee_spec):
+        numer += float(ev_axis[ii])*fee_data
+        denom += fee_data
+      return numer/denom
 
   def plot_correlation_ev_ebeam(self):
+    """  Function to see the correlation between eV reading from FEE spectrometer vs 
+         ebeam reading from psana. They should be highly correlated (i.e > 0.9)"""
 
   # Plot correlation between ebeam data and the eV data. Should be positively correlated
 
@@ -452,23 +468,38 @@ class FEE_spec(object):
     plt.show()
 
 
-  def get_photon_energy(self, run=223, evt=None):
+  def get_photon_energy(self, run=199, evt=None,mode='weighted_mean'):
+    """ Provided an event and a run number, returns the photon energy of that event 
+        The photon energy is a weighted mean of the reading from the FEE spectrometer
+        yielding a single number"""
     ds = DataSource('exp=mfxls4916:run=%d:smd'%run)
     env = ds.env()
     fee_spec = AreaDetector('FEE_Spec', env)
+
+    rayonix = Detector('MfxEndstation.0:Rayonix.0')
+    fee_gas_det = Detector('FEEGasDetEnergy')
+    #jungfrau1M = Detector('MfxEndstation.0:Jungfrau.0')
+    ebeam = Detector('EBeam')
+
+    calib_array = fee_spec.calib(evt)
+    ev_ebeam_reading=ebeam.get(evt)
+    fee_gas_reading=fee_gas_det.get(evt)
+    if calib_array is None or ev_ebeam_reading is None or fee_gas_reading is None:
+      return None
+
     xs=range(2038)
     scale_factor=self.beam_profile_cs(xs)
     ev_axis=[x*self.slope+self.intercept for x in range(2038)]
-    calib_array = fee_spec.calib(evt)
     if calib_array is not None:
       data=calib_array[:,:-10].sum(axis=0) - calib_array[25:50, :-10].sum(axis=0)
       scaled_data=(data-min(data))/(scale_factor)
-      photon_energy=self.get_center_of_ev_spec(scaled_data)
+      photon_energy=self.get_center_of_ev_spec(scaled_data, mode=mode)
       return photon_energy
     return None 
       
   def analyze_photon_energy(self, plot=False):
-
+    """ This function can be used to analyze and plot scaled and unscaled FEE spec
+         reading. Useful to see the effect if vignetting/beam profile corrections/calibration"""
     ds = DataSource('exp=mfxls4916:run=%d:smd'%self.run)
     env = ds.env()
     ebeam = Detector('EBeam')
@@ -585,8 +616,10 @@ class FEE_spec(object):
       plt.show()
 
 if __name__ == '__main__':
-  if False:
-    FEE = FEE_spec()
+  short_circuit=True
+  dump_pickle=False
+  if short_circuit and dump_pickle :
+    FEE = FEE_spec(Fe_foil_run=143)
     FEE.get_Fe_edge(plot=False)
     FEE.vignetting_correction_h5(plot=False)
     FEE.beam_profile_correction(plot=False)
@@ -594,7 +627,7 @@ if __name__ == '__main__':
     from libtbx.easy_pickle import dump
     dump('FEE.pickle', FEE)
     exit()
-  if True:
+  if not dump_pickle:
     from libtbx.easy_pickle import load
     FEE=load('FEE.pickle')
     print ('Should be plotting stuff')
