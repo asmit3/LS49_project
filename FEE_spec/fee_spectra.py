@@ -345,12 +345,109 @@ class FEE_spec(object):
         plt.imshow(all_img_avg[central_energies[0]][:,:-10]/fee_gas_mean)
     if plot:
       plt.show()
+
+
+  def beam_profile_horizontal(self,
+                              max_energy=7115.0,
+                              min_energy=7043.0,
+                              num_bins=18,
+                              apply_vignetting_corrections=True,
+                              plot=False):
+    """Try to get the beam profile correction by getting profile from
+       the horizontal direction. Try to be smart about running the binning calculations"""
+
+
+
+    ds = DataSource('exp=mfxls4916:run=%d:smd'%self.dithered_run)
+    env = ds.env()
+    fee_spec = AreaDetector('FEE_Spec', env)
+    fee_gas_det = Detector('FEEGasDetEnergy')
+    ebeam = Detector('EBeam')
+    count=0
+    max_event = 35000
+    min_event = 0
+    # Set up the arrays for binning
+    delta_E=(max_energy-min_energy)/num_bins
+    all_img_avg={}
+    all_fee_gas={}
+    central_energies=[]
+    stored_central_energies=[]
+    # Setup arrays in the dictionaries 
+    for i_bin in range(1,num_bins+1):
+      central_energy=min_energy+(i_bin-0.5)*delta_E
+      # FEE spectrometer size hardcoded from shift 2
+      all_img_avg[central_energy]=np.zeros((392, 2050),dtype=np.float32)
+      all_fee_gas[central_energy]=[]
+      central_energies.append(central_energy)
+#
+    for nevent,evt in enumerate(ds.events()):
+      e = ebeam.get(evt)
+      if nevent > max_event: break
+      if nevent < min_event: continue
+      if ebeam is None or e is None: continue
+      # Filter further based on max and min energies otherwise outliers 
+      # will mess things up 
+      ev_ebeam = e.ebeamPhotonEnergy()
+      if ev_ebeam > max_energy or ev_ebeam < min_energy: continue
+      calib_array = fee_spec.calib(evt)
+      if calib_array is not None:
+        try:
+          # Determine which bin ev_ebeam falls under
+          fee_gas_data=fee_gas_det.get(evt).f_11_ENRC()
+          # based on plot of sum(fee_intensity) vs fee_gas_intensity
+          # there seems to be real signal only for fee_gas_intensity above 0.2 (linear regime)
+          # Otherwise it looks like junk data
+          if fee_gas_data < 0.2: continue
+          central_energy,idx=find_nearest_idx(np.array(central_energies),ev_ebeam)
+          all_fee_gas[central_energy].append(fee_gas_data)
+          all_img_avg[central_energy]+=calib_array
+        except Exception as e:
+          print ('Error in calib_array',str(e))
+    if True:
+      psprof=[]
+      all_fee_I_max=[]
+      all_fee_I_px=[]
+      if plot:
+        plt.figure()
+      # This is only for identifying the extremes of the distribution
+      if False:
+        #central_energies=[7112.5, 7057.5]
+        central_energies=[7113.0, 7057.0]
+
+      for i_energy, central_energy in enumerate(central_energies):
+        print ('CENTRAL', central_energy)
+        img_avg=all_img_avg[central_energy]
+        fee_gas=all_fee_gas[central_energy]
+        fee_gas_correction=robust_mean_asmit(np.array(fee_gas))
+        if fee_gas_correction is None: continue
+        y=(img_avg[:,:-10].mean(axis=1) - img_avg[:,25:50].mean(axis=1))/fee_gas_correction
+        x=range(len(y))
+        v=np.argmax(img_avg[:,:-10].max(axis=0) - img_avg[25:50,:-10].mean(axis=0))
+        # Not sure how to apply vignetting corrections to horizontal data
+        if False: #apply_vignetting_corrections and self.vignetting_factor is not None:
+            y=y/self.vignetting_factor
+        popt,pcov = curve_fit(gaus,x[:-10],y[:-10],p0=[y[:-10].max(),x[:-10][np.argmax(y[:-10])],fwhm(x[:-10],y[:-10])/2.355])
+        popt[1]=v*1.0
+        psprof.append(popt)
+        disp_axis=range(2038)
+        all_fee_I_max.append(np.max(y))
+        all_fee_I_px.append(x[np.argmax(y)])
+        if plot:
+          plt.xlabel('Energy dispersion axis-Horizontal')
+          plt.ylabel('FEE spectrometer intensity')
+          plt.plot(disp_axis, gaus(disp_axis, *popt))
+        #if central_energy in [7112.5,7057.5]:
+        if central_energy in [7113.0, 7057.0]:
+          print ('3 sigma boundaries ',popt[1]+3*popt[2],popt[1]-3*popt[2])
+      if plot:
+        plt.show()
+
     
   def calibrate_fee_spec(self, plot=False):
     """Calibration
      Fe-edge position is known (x0,y0)=(1124,7112) (1141 from shift 2; 1124 from shift 3)
      Use delta_y = y2-y1 = 7115-7055 = 60eV
-     Use delta_x = x2-x1= 139-1923 # Reading it off the gaussian fit (all_gaus; look at the extremes)
+     Use delta_x = x2-x1= 139-1923 # Reading it off the gaussian fits (look at the extremes)
      Now fit a straight line using the equation
      (y-y0)/(x-x0)=(y2-y1)/(x2-x1) """
 
@@ -415,7 +512,6 @@ class FEE_spec(object):
     assert self.intercept is not None, 'ev-axis calibtation intercept is None. please check code'
     ev_axis=[x*self.slope+self.intercept for x in range(2038)]
 
-    # LCLS uses 1st moment of gaussian fit to spectra to report ebeam. Same concept used here
     if mode=='gauss_first_moment':
       y=fee_spec
       x=range(len(fee_spec))
@@ -429,6 +525,8 @@ class FEE_spec(object):
       return ev_axis[np.argmax(fee_spec)]
 
     # Return weighted mean of photon energy. Weighted by FEE intensity data
+    # Reference: Franson et.al Biochemistry (2018), 57, 4629
+    # Eq (1) 
     else:
       for ii, fee_data in enumerate(fee_spec):
         numer += float(ev_axis[ii])*fee_data
@@ -468,6 +566,35 @@ class FEE_spec(object):
     plt.show()
 
 
+  def plot_fee_spectra_of_event(self, event_timestamp=None):
+    """ Plot fee spectra of a certain timestamp. Also print out the ebeam value. Useful for sanity checks"""
+
+    from xfel.cxi.cspad_ana import cspad_tbx
+    assert event_timestamp is not None, 'event_timestamp cannot be None. Please supply event timestamp you are interested in'
+    ds = DataSource('exp=mfxls4916:run=%d:smd'%self.run)
+    env = ds.env()
+    fee_spec = AreaDetector('FEE_Spec', env)
+    ebeam = Detector('EBeam')
+    plt.figure()
+    xs=range(2038)
+    scale_factor = self.beam_profile_cs(xs)
+    ev_axis=[x*self.slope+self.intercept for x in range(2038)]
+    for nevent,evt in enumerate(ds.events()):
+      tx = evt.get(EventId).time()
+      sec=tx[0]
+      nsec=tx[1]
+      ts = cspad_tbx.evt_timestamp((sec,nsec/1e6))
+      if ts!=event_timestamp: continue
+      calib_array = fee_spec.calib(evt)
+      e=ebeam.get(evt)
+      if calib_array is not None and e is not None:
+        data=calib_array[:,:-10].sum(axis=0) - calib_array[25:50, :-10].sum(axis=0)
+        scaled_data=(data-min(data))/(scale_factor)
+        ebeam_energy=e.ebeamPhotonEnergy()
+        from IPython import embed; embed(); exit()
+        fee_energy.append(self.get_center_of_ev_spec(scaled_data))
+
+
   def get_photon_energy(self, run=199, evt=None,mode='weighted_mean'):
     """ Provided an event and a run number, returns the photon energy of that event 
         The photon energy is a weighted mean of the reading from the FEE spectrometer
@@ -504,6 +631,8 @@ class FEE_spec(object):
     env = ds.env()
     ebeam = Detector('EBeam')
     fee_spec = AreaDetector('FEE_Spec', env)
+    ebeam_energy=[]
+    fee_energy=[]
     if plot:
       fig1=plt.figure()
       fig2=plt.figure()
@@ -533,7 +662,9 @@ class FEE_spec(object):
           ax2.plot(ev_axis, scaled_data)
           #ax2.plot(ev_axis, np.log10(1.0+scaled_data))
         if e is not None:
-          print ('EBEAM photon energy=',e.ebeamPhotonEnergy(), self.get_center_of_ev_spec(scaled_data))
+          ebeam_energy.append(e.ebeamPhotonEnergy())
+          fee_energy.append(self.get_center_of_ev_spec(scaled_data))
+          #print ('EBEAM photon energy=',e.ebeamPhotonEnergy(), self.get_center_of_ev_spec(scaled_data))
         if plot:
           #xlim((500,1500))
           #print max(scaled_data)
@@ -550,7 +681,9 @@ class FEE_spec(object):
           #ax1.set_ylim((0,8.0))
           #print ('Calib array shape = ',calib_array.shape)
 
-        if nevent > 50: break
+        #if nevent > 50: break
+    print ('Printing summary statistics')
+    print ('Mean energies = %.2f (fee), %.2f (ebeam)'%(np.mean(fee_energy), np.mean(ebeam_energy)))
     if plot:
       plt.show()
 
@@ -619,11 +752,11 @@ if __name__ == '__main__':
   short_circuit=True
   dump_pickle=False
   if short_circuit and dump_pickle :
-    FEE = FEE_spec(Fe_foil_run=143)
+    FEE = FEE_spec(run=219,Fe_foil_run=143)
     FEE.get_Fe_edge(plot=False)
     FEE.vignetting_correction_h5(plot=False)
     FEE.beam_profile_correction(plot=False)
-    FEE.calibrate_fee_spec(plot=True)
+    FEE.calibrate_fee_spec(plot=False)
     from libtbx.easy_pickle import dump
     dump('FEE.pickle', FEE)
     exit()
@@ -632,4 +765,6 @@ if __name__ == '__main__':
     FEE=load('FEE.pickle')
     print ('Should be plotting stuff')
     FEE.analyze_photon_energy(plot=False)
+    FEE.beam_profile_horizontal(plot=True)
     FEE.plot_correlation_ev_ebeam()
+    FEE.plot_fee_spectra_of_event(event_timestamp='2018-05-01T14:25Z24.942')
