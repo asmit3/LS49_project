@@ -344,6 +344,10 @@ xtc_phil_str = '''
     photon_energy_from_FEE = True
       .type = bool
       .help = read in photon energy from FEE spectrometer instead of ebeam.
+    fee_calibration_file = None
+      .type = str
+      .help = fee calibration file that will be used to read off slope/intercept values \
+              to map fee pixels to ev axis
 
   }
 '''
@@ -1049,8 +1053,10 @@ class InMemScript(DialsProcessScript, DialsProcessorWithLogging):
       else:
         if self.params.LS49.photon_energy_from_FEE:
           from libtbx.easy_pickle import load
-          FEE=load('/reg/d/psdm/mfx/mfxls4916/scratch/asmit/LS49_2019/input/FEE_r143_v0.pickle')
-          photon_energy=FEE.get_photon_energy(run=self.params.input.run_num, evt=evt, mode='gauss_first_moment')
+          assert self.params.LS49.fee_calibration_file is not None, 'Please supply FEE calibration pickle'
+          FEE=load(os.path.join(self.params.LS49.fee_calibration_file))
+          #FEE=load('/reg/d/psdm/mfx/mfxls4916/scratch/asmit/LS49_2019/input/FEE_r143_v0.pickle')
+          photon_energy=FEE.get_photon_energy(run=self.params.input.run_num, evt=evt)
           if photon_energy is None:
             print ("No wavelength from FEE, skipping shot")
             self.debug_write("no_wavelength_FEE", "skip")

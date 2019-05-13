@@ -331,6 +331,8 @@ class FEE_spec(object):
       self.beam_profile_cs=CubicSpline(x,y)
       #plot(x,beam_profile_cs(x),'*-',c='blue')
       # !!! Beam profile correction params saved here !!!
+      # Save the gaussian mean positions. Might be used to calibrate fee_spectra
+      self.gauss_window_beam_params=psprof
       if False:
        plt.figure()
        x=range(2048)
@@ -457,16 +459,29 @@ class FEE_spec(object):
     x0=self.Fe_edge_pixel # Accounting for 10 pixels ignored.  
     y0=7112 # Fe-edge 
     slope=60.0/(139-1923) # Ignore 10 pixels because they cancel out
+    # attempt to take a mean/median slope instead of taking it between 2 extreme datapoints
+    # Note that the diffeence is 4 eV windows.
+    all_slopes=[]
+    window_means=[p[1] for p in self.gauss_window_beam_params]
+    for ii in range(len(window_means)-1):
+      tmp_slope=-4.0/(window_means[ii]-window_means[ii+1])
+      all_slopes.append(tmp_slope)
     
     # defining slope using vignetting corrected beam profile data: use nbins=18
     # 1. using the mean of 7113 and 7057 instead of 3sigma
     #slope=(7113-7057)/(566.-1402.)
     # 2. use the 3 sigma values of 139 and 2055
     #slope=(72)/(139.0-2055.0)
+    # 3. take average slope between 7115 and 7043 means over 4ev windows
+    #slope=-0.07295042
+    #slope=np.mean(all_slopes)
+    # 4. take median slope between 7115 and 7043 means over 4eV windows
+    # take median
+    slope=np.median(all_slopes)
     
     ##slope=60.0/(97-1963)
     intercept=y0-slope*x0
-    print (slope, intercept)
+    print ('Slope=%.3f, Intercept=%.3f'%(slope, intercept))
     # Try Fe-edge value for consistency check
     x=1141
     y=slope*x+intercept
@@ -558,13 +573,12 @@ class FEE_spec(object):
         scaled_data=(data-min(data))/(scale_factor)
         ebeam_energy.append(e.ebeamPhotonEnergy())
         fee_energy.append(self.get_center_of_ev_spec(scaled_data))
-        if nevent > 2000: break
+        #if nevent > 2000: break
     plt.plot(ebeam_energy,fee_energy,'*')
     print ('correlation coefficient', np.corrcoef(ebeam_energy, fee_energy))
     plt.xlabel('EBEAM energy')
     plt.ylabel('FEE weighted central energy')
     plt.show()
-
 
   def plot_fee_spectra_of_event(self, event_timestamp=None):
     """ Plot fee spectra of a certain timestamp. Also print out the ebeam value. Useful for sanity checks"""
@@ -591,9 +605,12 @@ class FEE_spec(object):
         data=calib_array[:,:-10].sum(axis=0) - calib_array[25:50, :-10].sum(axis=0)
         scaled_data=(data-min(data))/(scale_factor)
         ebeam_energy=e.ebeamPhotonEnergy()
-        from IPython import embed; embed(); exit()
-        fee_energy.append(self.get_center_of_ev_spec(scaled_data))
-
+        fee_energy=self.get_center_of_ev_spec(scaled_data)
+        print ('Mean energy of event = %.3f (fee), %.3f (ebeam)'%(fee_energy, ebeam_energy))
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.plot(ev_axis, scaled_data)
+        plt.show()
 
   def get_photon_energy(self, run=199, evt=None,mode='weighted_mean'):
     """ Provided an event and a run number, returns the photon energy of that event 
@@ -750,7 +767,7 @@ class FEE_spec(object):
 
 if __name__ == '__main__':
   short_circuit=True
-  dump_pickle=False
+  dump_pickle=True
   if short_circuit and dump_pickle :
     FEE = FEE_spec(run=219,Fe_foil_run=143)
     FEE.get_Fe_edge(plot=False)
@@ -767,4 +784,5 @@ if __name__ == '__main__':
     FEE.analyze_photon_energy(plot=False)
     FEE.beam_profile_horizontal(plot=True)
     FEE.plot_correlation_ev_ebeam()
+    # Timestamp used in run 2019 as an example '2018-05-01T14:25Z24.942' 
     FEE.plot_fee_spectra_of_event(event_timestamp='2018-05-01T14:25Z24.942')
