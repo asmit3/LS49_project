@@ -1,0 +1,144 @@
+[
+  {
+    "__id__": "DataBlock", 
+    "imageset": [
+      {
+        "__id__": "ImageSet", 
+        "mask": null, 
+        "images": [
+          {
+            "filename": "/net/cci-filer2/raid1/home/asmit/LS49_prepwork/1000/jungfrau/step5_MPIbatch_000000_jungfrau.cbf", 
+            "gain": null, 
+            "pedestal": null, 
+            "dx": null, 
+            "dy": null, 
+            "beam": 0, 
+            "detector": 0
+          }
+        ], 
+        "params": {}
+      }
+    ], 
+    "beam": [
+      {
+        "direction": [
+          0.0, 
+          0.0, 
+          1.0
+        ], 
+        "transmission": 1.0, 
+        "polarization_normal": [
+          0.0, 
+          1.0, 
+          0.0
+        ], 
+        "divergence": 0.0, 
+        "polarization_fraction": 0.999, 
+        "flux": 0.0, 
+        "sigma_divergence": 0.0, 
+        "wavelength": 1.74155
+      }
+    ], 
+    "detector": [
+      {
+        "hierarchy": {
+          "origin": [
+            0.0, 
+            0.0, 
+            0.0
+          ], 
+          "fast_axis": [
+            1.0, 
+            0.0, 
+            0.0
+          ], 
+          "name": "", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            0.0, 
+            1.0, 
+            0.0
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            0.0, 
+            0.0
+          ], 
+          "image_size": [
+            0, 
+            0
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "identifier": "", 
+          "type": "", 
+          "children": [
+            {
+              "panel": 0
+            }
+          ], 
+          "pixel_size": [
+            0.0, 
+            0.0
+          ]
+        }, 
+        "panels": [
+          {
+            "origin": [
+              -374.892499855, 
+              28.4, 
+              -331.0
+            ], 
+            "fast_axis": [
+              1.0, 
+              0.0, 
+              0.0
+            ], 
+            "name": "Panel", 
+            "raw_image_offset": [
+              0, 
+              0
+            ], 
+            "slow_axis": [
+              0.0, 
+              -1.0, 
+              0.0
+            ], 
+            "material": "", 
+            "mask": [], 
+            "thickness": 0.0, 
+            "mu": 0.0, 
+            "gain": 1.0, 
+            "trusted_range": [
+              -1.0, 
+              2000000.0
+            ], 
+            "image_size": [
+              1024, 
+              1024
+            ], 
+            "px_mm_strategy": {
+              "type": "SimplePxMmStrategy"
+            }, 
+            "identifier": "", 
+            "type": "SENSOR_PAD", 
+            "pixel_size": [
+              0.075, 
+              0.075
+            ]
+          }
+        ]
+      }
+    ], 
+    "goniometer": [], 
+    "scan": []
+  }
+]
