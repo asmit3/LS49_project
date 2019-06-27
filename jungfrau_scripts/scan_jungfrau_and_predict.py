@@ -72,8 +72,8 @@ ts=sys.argv[1]
 
 # Load rayonix integrated experiment
 rayonix_fname=os.path.join('rayonix_expt', 'idx-%s_integrated_experiments.json'%ts)
-rayonix_expt=ExperimentListFactory.from_json_file(rayonix_fname)
-jungfrau_det=ExperimentListFactory.from_json_file('rotated_plus_90.json')
+rayonix_expt=ExperimentListFactory.from_json_file(rayonix_fname, check_format=False)
+jungfrau_det=ExperimentListFactory.from_json_file('rotated_plus_90.json', check_format=False)
 
 # Load jungfrau image and imageset
 jungfrau_fname=os.path.join('jungfrau_cbf', 'jungfrauhit_%s.cbf'%ts)
