@@ -9,7 +9,13 @@ import os
 from xfel.cxi.cspad_ana import cspad_tbx
 
 message = """ Script to write out a smaller xtc file based on provided list of timestamps
-              Initial script courtesy of Christopher O'Grady [SLAC]"""
+              Initial script courtesy of Christopher O'Grady [SLAC]
+
+              Make sure you always save the stuff with datagram id not equal to 12
+              as that has the configuration info
+              Once xtc file is created use the following for smd/idx files
+              a) xtcindex -f junk.xtc -o junk.xtc.idx
+              b) smldata -f junk.xtc -o junk.smd.xtc"""
 
 class Dgram:
   def __init__(self,f):
@@ -72,6 +78,9 @@ if __name__=='__main__':
       try:
         dg = Dgram(infile)
         counter +=1
+        if dg.transitionId() !=12:
+          print ('DG stuff:: not transitionId 12  = ',dg.transitionId(),dg.clocklow(),dg.clockhigh())
+          dg.write(outfile)
         if (dg.clockhigh(),dg.clocklow()) not in timestamps_indexed: continue
         print ('DG stuff = ',dg.transitionId(),dg.clocklow(),dg.clockhigh())
         dg.write(outfile)
