@@ -539,6 +539,9 @@ class FEE_spec(object):
     if mode=='max_fee':
       return ev_axis[np.argmax(fee_spec)]
 
+    if mode=='fixed_value':
+      return 7122.0 # Return a fixed value; this is mostly for debugging
+
     # Return weighted mean of photon energy. Weighted by FEE intensity data
     # Reference: Franson et.al Biochemistry (2018), 57, 4629
     # Eq (1) 
@@ -554,8 +557,10 @@ class FEE_spec(object):
 
   # Plot correlation between ebeam data and the eV data. Should be positively correlated
 
+    from xfel.cxi.cspad_ana import cspad_tbx
     ebeam_energy=[]
     fee_energy=[]
+    xfel_ts = []
 
     ds = DataSource('exp=mfxls4916:run=%d:smd'%self.run)
     env = ds.env()
@@ -573,23 +578,58 @@ class FEE_spec(object):
         scaled_data=(data-min(data))/(scale_factor)
         ebeam_energy.append(e.ebeamPhotonEnergy())
         fee_energy.append(self.get_center_of_ev_spec(scaled_data))
+        ts=cspad_tbx.evt_timestamp(cspad_tbx.evt_time(evt))
+        xfel_ts.append(ts)
         #if nevent > 2000: break
+    
     plt.plot(ebeam_energy,fee_energy,'*')
     print ('correlation coefficient', np.corrcoef(ebeam_energy, fee_energy))
     plt.xlabel('EBEAM energy')
     plt.ylabel('FEE weighted central energy')
     plt.show()
 
+  def save_spectra_of_select_events(self, timestamps, fname='fee_spectra_info.pickle', save_event=True):
+    ''' Save spectra of select timestamps in the form of a pickle file
+        @params: timestamps is a list containing cctbx style timestamp eg. ['20180501143559313'] ''' 
+
+    from xfel.cxi.cspad_ana import cspad_tbx
+    from scitbx.array_family import flex
+    fee_energy={}
+    fee_spectra = {}
+
+    ds = DataSource('exp=mfxls4916:run=%d:smd'%self.run)
+    env = ds.env()
+    fee_spec = AreaDetector('FEE_Spec', env)
+    xs=range(2038)
+    scale_factor = self.beam_profile_cs(xs)
+    ev_axis=[x*self.slope+self.intercept for x in range(2038)]
+    for nevent,evt in enumerate(ds.events()):
+      ts=cspad_tbx.evt_timestamp(cspad_tbx.evt_time(evt))
+      xfel_ts = ts[0:4] + ts[5:7] + ts[8:10] + ts[11:13] + ts[14:16] + ts[17:19] + ts[20:23]
+      if xfel_ts not in timestamps: continue
+      calib_array = fee_spec.calib(evt)
+      if calib_array is not None:
+        data=calib_array[:,:-10].sum(axis=0) - calib_array[25:50, :-10].sum(axis=0)
+        scaled_data=(data-min(data))/(scale_factor)
+        fee_data_for_this_shot = flex.vec2_double()
+        for x,y in zip(ev_axis, scaled_data):
+          fee_data_for_this_shot.append((x,y))
+        fee_spectra[xfel_ts] = fee_data_for_this_shot
+        fee_energy[xfel_ts] = self.get_center_of_ev_spec(scaled_data)
+    if save_event:
+      from libtbx.easy_pickle import dump
+      dump(fname, fee_spectra) 
+
+
   def plot_fee_spectra_of_event(self, event_timestamp=None):
     """ Plot fee spectra of a certain timestamp. Also print out the ebeam value. Useful for sanity checks"""
-
+    
     from xfel.cxi.cspad_ana import cspad_tbx
     assert event_timestamp is not None, 'event_timestamp cannot be None. Please supply event timestamp you are interested in'
     ds = DataSource('exp=mfxls4916:run=%d:smd'%self.run)
     env = ds.env()
     fee_spec = AreaDetector('FEE_Spec', env)
     ebeam = Detector('EBeam')
-    plt.figure()
     xs=range(2038)
     scale_factor = self.beam_profile_cs(xs)
     ev_axis=[x*self.slope+self.intercept for x in range(2038)]
@@ -607,9 +647,12 @@ class FEE_spec(object):
         ebeam_energy=e.ebeamPhotonEnergy()
         fee_energy=self.get_center_of_ev_spec(scaled_data)
         print ('Mean energy of event = %.3f (fee), %.3f (ebeam)'%(fee_energy, ebeam_energy))
+        import numpy as np
         import matplotlib.pyplot as plt
+        y=np.arange(min(scaled_data), max(scaled_data), 1000)
         plt.figure()
         plt.plot(ev_axis, scaled_data)
+        plt.plot([fee_energy]*len(y), y, '-r')
         plt.show()
 
   def get_photon_energy(self, run=199, evt=None,mode='weighted_mean'):
@@ -619,6 +662,7 @@ class FEE_spec(object):
     ds = DataSource('exp=mfxls4916:run=%d:smd'%run)
     env = ds.env()
     fee_spec = AreaDetector('FEE_Spec', env)
+    #import pdb; pdb.set_trace()
 
     rayonix = Detector('MfxEndstation.0:Rayonix.0')
     fee_gas_det = Detector('FEEGasDetEnergy')
@@ -765,9 +809,17 @@ class FEE_spec(object):
       plt.imshow(fee_data)
       plt.show()
 
+
+def cctbx_to_psana_ts_converter(cctbx_ts):
+  ''' Given a cctbx style timestamp, convert it to a psana style timestamp
+      Eg. 20180501143559313 gets converted to 2018-05-01T14:35Z59.313''' 
+  return cctbx_ts[0:4]+'-'+cctbx_ts[4:6]+'-'+cctbx_ts[6:8]+'T'+cctbx_ts[8:10]+':'+\
+         cctbx_ts[10:12]+'Z'+cctbx_ts[12:14]+'.'+cctbx_ts[14:17]
+
+
 if __name__ == '__main__':
   short_circuit=True
-  dump_pickle=True
+  dump_pickle=False
   if short_circuit and dump_pickle :
     FEE = FEE_spec(run=219,Fe_foil_run=143)
     FEE.get_Fe_edge(plot=False)
@@ -779,10 +831,16 @@ if __name__ == '__main__':
     exit()
   if not dump_pickle:
     from libtbx.easy_pickle import load
-    FEE=load('FEE.pickle')
+    FEE=load('/reg/d/psdm/mfx/mfxls4916/scratch/asmit/LS49_SAD_v3/input/FEE_r143_v1.pickle')
     print ('Should be plotting stuff')
-    FEE.analyze_photon_energy(plot=False)
-    FEE.beam_profile_horizontal(plot=True)
-    FEE.plot_correlation_ev_ebeam()
+    FEE.run=222
+    #FEE.analyze_photon_energy(plot=False)
+    #FEE.beam_profile_horizontal(plot=False)
+    #FEE.plot_correlation_ev_ebeam()
+    #timestamps_of_interest = ['20180501143559313']
+    timestamps_of_interest = ['20180501143555114']
+    #for ts in timestamps_of_interest:
+    #  FEE.plot_fee_spectra_of_event(cctbx_to_psana_ts_converter(ts))
+    FEE.save_spectra_of_select_events(timestamps_of_interest, fname='fee_data_r0222.pickle')
     # Timestamp used in run 2019 as an example '2018-05-01T14:25Z24.942' 
-    FEE.plot_fee_spectra_of_event(event_timestamp='2018-05-01T14:25Z24.942')
+    #FEE.plot_fee_spectra_of_event(event_timestamp='2018-05-01T14:25Z24.942')
