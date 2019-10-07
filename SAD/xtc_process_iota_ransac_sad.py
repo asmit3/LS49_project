@@ -52,16 +52,16 @@ class InMemScript_LS49_RANSAC(InMemScript_LS49_SAD, Processor_iota):
       3. debug_write
       4. debug_start '''
   def __init__(self):
-    InMemScript.__init__(self)
+    InMemScript_LS49_SAD.__init__(self)
 
   def finalize(self):
-    InMemScript.finalize(self)
+    InMemScript_LS49_SAD.finalize(self)
 
   def debug_write(self, string, state=None):
-    InMemScript.debug_write(self, string, state)
+    InMemScript_LS49_SAD.debug_write(self, string, state)
 
   def debug_start(self, ts):
-    InMemScript.debug_start(self, ts)
+    InMemScript_LS49_SAD.debug_start(self, ts)
 
 if __name__ == "__main__":
   # Fix to make init method work for InMemScript_iota
