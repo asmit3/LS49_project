@@ -146,7 +146,7 @@ class InMemScript_LS49_SAD(InMemScript):
           assert self.params.LS49.fee_calibration_file is not None, 'Please supply FEE calibration pickle'
           FEE=load(os.path.join(self.params.LS49.fee_calibration_file))
           #FEE=load('/reg/d/psdm/mfx/mfxls4916/scratch/asmit/LS49_2019/input/FEE_r143_v0.pickle')
-          photon_energy=FEE.get_photon_energy(run=self.params.input.run_num, evt=evt)
+          photon_energy=FEE.get_photon_energy(run=run.run(), evt=evt)
           if photon_energy is None:
             print ("No wavelength from FEE, skipping shot")
             self.debug_write("no_wavelength_FEE", "skip")
