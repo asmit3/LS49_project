@@ -21,10 +21,16 @@ Create a new folder on your mac - I call it dials and cd into it
   b. cd dxtbx; git checkout XTC_timestamp_identifier; cd ..
   c. cd cctbx_project; git checkout LS49_exp; cd ..
 
-5. Compile the docker image 
+5. Get the mpi4py and mpich sources
+  a curl -L -O http://www.mpich.org/static/downloads/3.2.1/mpich-3.2.1.tar.gz
+  b tar -xvzf mpich-3.2.1.tar.gz 
+  c curl -L -O https://bitbucket.org/mpi4py/mpi4py/downloads/mpi4py-3.0.0.tar.gz
+  d tar -xvzf mpi4py-3.0.0.tar.gz 
+
+6. Compile the docker image 
   a. docker build . [Note the .]
 
-6. Upload the image to docker hub. My docker image is at asmit3/ls49:latest
+7. Upload the image to docker hub. My docker image is at asmit3/ls49:latest
   a. docker tag <imageID> asmit3/ls49:latest [imageID is the ID produced at the end of docker build] 
   b. docker login
   c. docker push asmit3/ls49:latest
