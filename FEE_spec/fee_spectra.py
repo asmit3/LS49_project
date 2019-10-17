@@ -4,7 +4,7 @@ from psana import *
 from Detector.EpicsDetector import EpicsDetector
 from Detector.AreaDetector import AreaDetector
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from scipy.integrate import trapz
 import itertools
 import math
@@ -648,7 +648,7 @@ class FEE_spec(object):
         fee_energy=self.get_center_of_ev_spec(scaled_data)
         print ('Mean energy of event = %.3f (fee), %.3f (ebeam)'%(fee_energy, ebeam_energy))
         import numpy as np
-        import matplotlib.pyplot as plt
+        #import matplotlib.pyplot as plt
         y=np.arange(min(scaled_data), max(scaled_data), 1000)
         plt.figure()
         plt.plot(ev_axis, scaled_data)
