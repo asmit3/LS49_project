@@ -396,6 +396,15 @@ class InMemScript_LS49_RANSAC_multiple_runs(InMemScript_LS49_SAD_multiple_runs, 
                 self.mpi_log_write("Sending stop to %d\n"%rankreq)
                 comm.send('endrun',dest=rankreq)
               self.mpi_log_write("All stops sent.")
+            # rank 0 has finished iterating through this run: tell other folks to move on who are waiting
+            else:
+              self.mpi_log_write("Rank_0 done with run %d :: Sending transition signal\n"%run.run())
+              for rankreq in range(size-1):
+                self.mpi_log_write("Getting next available process\n")
+                rankreq = comm.recv(source=MPI.ANY_SOURCE)
+                self.mpi_log_write("Sending transition signal to %d\n"%rankreq)
+                comm.send('transitionrun',dest=rankreq)
+              self.mpi_log_write("All transitions sent.\n")
           else:
             # client process
             while True:
@@ -406,6 +415,9 @@ class InMemScript_LS49_RANSAC_multiple_runs(InMemScript_LS49_SAD_multiple_runs, 
               offset = comm.recv(source=0)
               if offset == 'endrun':
                 print("Rank %d recieved endrun"%rank)
+                break
+              if offset == 'transitionrun':
+                print("Rank %d recieved transitionrun"%rank)
                 break
               evt = ds.jump(offset.filenames, offset.offsets, offset.lastBeginCalibCycleDgram)
               print("Rank %d beginning processing"%rank)
