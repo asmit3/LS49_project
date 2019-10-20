@@ -1,0 +1,70 @@
+input {
+  address = "MfxEndstation.0:Rayonix.0"
+}
+format {
+  cbf {
+    detz_offset = 140.2
+    mode = cspad *rayonix
+    rayonix {
+      bin_size = 4
+      override_beam_x = -101
+      override_beam_y = 375
+    }
+  }
+}
+output {
+  experiments_filename = None
+  strong_filename = None
+}
+spotfinder {
+  filter {
+    min_spot_size = 2
+    d_min = 2
+  }
+  threshold {
+    dispersion {
+      gain = 0.46
+      global_threshold = 50
+    }
+  }
+}
+indexing {
+  known_symmetry {
+    space_group = P 1 21 1
+    unit_cell = 63.6,28.8,35.6,90,106.5,90
+  }
+  refinement_protocol {
+    d_min_start = 2
+  }
+  method = real_space_grid_smart_search
+}
+iota {
+  filter_spots=False
+  random_sub_sampling {
+    fraction_sub_sample=0.80
+    ntrials=100
+    no_outlier_rejection_and_candidates_refinement=True
+    finalize_method=union_and_reindex
+    align_calc_spots_with_obs=False
+    debug_mode=False
+    load_pickle_flag=False
+    dump_indexing_trials=False
+    Z_cutoff=2.0
+  }
+}
+indexing.basis_vector_combinations.max_refine=1
+indexing.stills.candidate_outlier_rejection=False
+indexing.index_assignment.simple.hkl_tolerance=0.30
+radial_average {
+  enable = True
+  two_theta_low = 25.5
+  two_theta_high = 29.5
+  verbose = False
+  output_bins = False
+  show_plots = False
+}
+LS49.fee_calibration_file='/tmp/FEE_r143_v1.pickle'
+profile.gaussian_rs.centroid_definition=com
+spotfinder.threshold.algorithm=dispersion
+
+
