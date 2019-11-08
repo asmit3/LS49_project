@@ -838,7 +838,29 @@ if __name__ == '__main__':
     #FEE.beam_profile_horizontal(plot=False)
     #FEE.plot_correlation_ev_ebeam()
     #timestamps_of_interest = ['20180501143559313']
-    timestamps_of_interest = ['20180501143555114']
+    timestamps_of_interest = ['20180501143533988',
+                              '20180501143546717',
+                              '20180501143546817',
+                              '20180501143547150',
+                              '20180501143548650',
+                              '20180501143549416',
+                              '20180501143549949',
+                              '20180501143551715',
+                              '20180501143555114',
+                              '20180501143559313',
+                              '20180501143602713',
+                              '20180501143606545',
+                              '20180501143620206',
+                              '20180501143625171',
+                              '20180501143628702',
+                              '20180501143628902',
+                              '20180501143631168',
+                              '20180501143632300',
+                              '20180501143640763',
+                              '20180501143643462',
+                              '20180501143643662',
+                              '20180501143652325',
+                              '20180501143701853']
     #for ts in timestamps_of_interest:
     #  FEE.plot_fee_spectra_of_event(cctbx_to_psana_ts_converter(ts))
     FEE.save_spectra_of_select_events(timestamps_of_interest, fname='fee_data_r0222.pickle')
