@@ -1,0 +1,76 @@
+data = ../all_files
+run_no = None
+title = LS49
+scale {
+  d_min = 2.5
+  d_max = 14.0
+  sigma_min = 1.5
+}
+postref {
+  residual_threshold = 5
+  residual_threshold_xy = 5
+  scale {
+    d_min = 2.5
+    d_max = 14.0
+    sigma_min = 1.5
+    partiality_min = 0.1
+  }
+  crystal_orientation {
+    flag_on = True
+    d_min = 2.5
+    d_max = 14.0
+    sigma_min = 1.5
+    partiality_min = 0.1
+  }
+  reflecting_range {
+    flag_on = True
+    d_min = 2.5
+    d_max = 14.0
+    sigma_min = 1.5
+    partiality_min = 0.1
+  }
+  unit_cell {
+    flag_on = True
+    d_min = 2.5
+    d_max = 14.0
+    sigma_min = 1.5
+    partiality_min = 0.1
+    uc_tolerance = 5
+  }
+  allparams {
+    flag_on = True
+    d_min = 2.5
+    d_max = 14.0
+    sigma_min = 1.5
+    partiality_min = 0.1
+    uc_tolerance = 5
+  }
+}
+merge {
+  d_min = 2.5
+  d_max = 14.0
+  sigma_min = 0.5
+  partiality_min = 0.1
+  uc_tolerance = 3
+  match_resolution = True
+}
+target_unit_cell = 63.6,28.8,35.6,90,106.5,90
+target_space_group = P1211
+target_anomalous_flag = True
+flag_weak_anomalous = False
+n_residues = 152
+hklisoin = None
+hklrefin = None
+n_postref_cycle = 3
+n_postref_sub_cycle = 1
+n_rejection_cycle = 1
+sigma_rejection = 5
+pixel_size_mm = 0.177083333333
+flag_monte_carlo = False
+#n_processors = 12
+#queue {
+#  mode = bsub
+#  qname = psanaq
+#  n_nodes = 24
+#}
+#timeout_seconds = 300
