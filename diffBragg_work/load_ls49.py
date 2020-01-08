@@ -27,7 +27,7 @@ def strong_spot_mask(refl_tbl, img_size):
 def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
                             Nstrongest = 30,
                             resmax=12.0, resmin=3.0,
-                            mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
+                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             ls49_data_dir=None):
     import os, pickle, numpy as np
     from scipy.interpolate import interp1d
@@ -71,6 +71,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     snr2 = refls['intensity.sum.value'] / flex.sqrt(refls['intensity.sum.variance'])
 
     bboxes = [list(refls['shoebox'][i].bbox)[:4] for i in range(len(refls)) ]
+    resolutions = [D[0].get_resolution_at_pixel(B.get_s0(), refls[i]['xyzobs.px.value'][0:2]) for i in range(len(refls))]
     bboxes = np.array(bboxes)
     bboxes[bboxes > 960] = 959
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
@@ -91,7 +92,11 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
 
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,'fee_data_r0222.pickle'), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
-    interp_energies = np.arange(7120, 7150, 0.5)
+    max_energy  = chann_lambda[np.argmax(channI)]
+    min_energy_interpol = max_energy - 30
+    max_energy_interpol = max_energy + 30
+    print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
+    interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
     interp_fluxes /= interp_fluxes.sum()
     interp_fluxes *= 1000000000000.0
@@ -106,7 +111,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
-            'mask': is_BAD_pixel, 'experiment':exp}
+            'mask': is_BAD_pixel, 'experiment':exp, 'resolution': resolutions}
 
 
 if __name__ == "__main__":
@@ -149,8 +154,8 @@ if __name__ == "__main__":
                               '20180501143701853'] # Does not work
 
 
-    ts = timestamps_of_interest[22]
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=30, resmin=2.5, resmax=13.2)
+    ts = timestamps_of_interest[7]
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=30, resmin=2.3, resmax=4.0)
 
     C = data["dxcrystal"]
     D = data["dxdetector"]
@@ -164,15 +169,19 @@ if __name__ == "__main__":
                          crystal=C)
     dump_explist = ExperimentList([exp])
     dump_explist.as_file('before_refinement_%s.expt'%ts)
+
+    # Some global variables here for LS49
+    mos_spread_deg=0.01
+    n_mos_domains=1
     
 
     a,b,c,_,_,_ = C.get_unit_cell().parameters()
-    Deff = 304 #1000
+    Deff = 1000
     Ncells_abc = np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
     nbcryst = nanoBragg_crystal.nanoBragg_crystal()
     nbcryst.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
-    nbcryst.mos_spread_deg = 0.01
-    nbcryst.n_mos_domains = 1
+    nbcryst.mos_spread_deg = mos_spread_deg
+    nbcryst.n_mos_domains = n_mos_domains
     nbcryst.thick_mm = 0.005
     nbcryst.miller_array = data["sfall"]
     nbcryst.dxtbx_crystal = C
@@ -216,6 +225,7 @@ if __name__ == "__main__":
 
     RUC = RefineAll(
         spot_rois=data["bboxes_x1x2y1y2"],
+        spot_resolution=data['resolution'],
         abc_init=data["tilt_abc"],
         img=data["data_img"],
         SimData_instance=SIM,
@@ -227,32 +237,159 @@ if __name__ == "__main__":
     RUC.trad_conv_eps = 1e-5
     RUC.max_calls = 250
     RUC.refine_background_planes = False
-    RUC.refine_Umatrix = True
-    RUC.refine_Bmatrix = True
+    RUC.refine_Umatrix = False
+    RUC.refine_Bmatrix = False
     RUC.verbose=True
     RUC.plot_stride=1
     RUC.refine_background_planes = False
-    RUC.refine_ncells=True #
-    RUC.refine_crystal_scale = True # scale factor
+    RUC.refine_ncells=False #
+    RUC.refine_crystal_scale = False # scale factor
     RUC.refine_gain_fac = False
     RUC.refine_detdist=False
     RUC.use_curvatures_threshold=7 # Keep calculating them and after 7 times switch over to using them
     RUC.use_curvatures=False #
-    RUC.calc_curvatures=True # switch over and try to use them when needed
+    RUC.calc_curvatures=True # if set to False, never uses curvatures
+    RUC.refine_with_restraints=True
+    #RUC.run()
+    #if RUC.hit_break_to_use_curvatures:
+    #  RUC.num_positive_curvatures=0
+    #  RUC.use_curvatures=True
+    #  RUC.run(setup=False) # Now it will use curvatures
+
+    # First refine scale factors and ncells, then refine everything else
+    RUC.refine_ncells=True
+    RUC.refine_crystal_scale=True
     RUC.run()
-    if RUC.hit_break_to_use_curvatures:
-      RUC.num_positive_curvatures=0
-      RUC.use_curvatures=True
-      RUC.run(setup=False) # Now it will use curvatures
+    refined_ncells = RUC.x[7]
+    refined_scale = RUC.x[10]
+
+    if False:
+      for i_spot in range(RUC.n_spots):
+        fig, axs = plt.subplots(1,2)
+        axs[0].imshow([[0, 1, 1], [0, 1, 2]])
+        axs[1].imshow([[0, 1, 1], [0, 1, 2]])
+        x = RUC.store_model_Lambda[i_spot]
+        y = RUC.store_Imeas[i_spot]
+        vmin = RUC.store_vmin[i_spot]
+        vmax = RUC.store_vmax[i_spot]
+        axs[0].images[0].set_data(x)
+        axs[1].images[0].set_data(y)
+        axs[0].images[0].set_clim(vmin, vmax)
+        axs[1].images[0].set_clim(vmin, vmax)
+        plt.suptitle("Spot number = %d"%i_spot)
+      plt.show()
+
+    #from IPython import embed; embed(); exit() 
+    # Now set the other stuff to refine
+    print (' ================== now refining all the variables ======================= ')
+    Ncells_abc = refined_ncells #np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
+    nbcryst = nanoBragg_crystal.nanoBragg_crystal()
+    nbcryst.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
+    nbcryst.mos_spread_deg = mos_spread_deg
+    nbcryst.n_mos_domains = n_mos_domains
+    nbcryst.thick_mm = 0.005
+    nbcryst.miller_array = data["sfall"]
+    nbcryst.dxtbx_crystal = C
+
+    nbbeam = nanoBragg_beam.nanoBragg_beam()
+    nbbeam.unit_s0 = B.get_unit_s0()
+    nbbeam.spectrum = data["spectrum"]
+
+    SIM2 = SimData()
+    SIM2.crystal = nbcryst
+    SIM2.detector = D
+    SIM2.beam = nbbeam
+
+    SIM2.instantiate_diffBragg(adc_offset=0,
+                              oversample=0,
+                              interpolate=0,
+                              verbose=0)
+    SIM2.D.show_params()
+    RUC2 = RefineAll(
+        spot_rois=data["bboxes_x1x2y1y2"],
+        spot_resolution=data['resolution'],
+        abc_init=data["tilt_abc"],
+        img=data["data_img"],
+        SimData_instance=SIM2,
+        plot_images=args.plot,
+        ucell_manager=UcellMan,
+        init_gain=1,
+        init_scale=refined_scale)
+    RUC2.trad_conv = True
+    RUC2.trad_conv_eps = 1e-5
+    RUC2.max_calls = 250
+    RUC2.refine_background_planes = False
+    RUC2.refine_Umatrix = True
+    RUC2.refine_Bmatrix = True
+    RUC2.verbose=True
+    RUC2.plot_stride=1
+    RUC2.refine_background_planes = False
+    RUC2.refine_ncells=True #
+    RUC2.refine_crystal_scale = True # scale factor
+    RUC2.refine_gain_fac = False
+    RUC2.refine_detdist=False
+    RUC2.use_curvatures_threshold=7 # Keep calculating them and after 7 times switch over to using them
+    RUC2.use_curvatures=False #
+    RUC2.calc_curvatures=True # if set to False, never uses curvatures
+    RUC2.run()
+    #from IPython import embed; embed(); exit()
 
     print("Done.")
     print("Refined scale =%f", RUC.x[-1])
+    if True:
+      for i_spot in range(RUC2.n_spots):
+        fig, axs = plt.subplots(3,2)
+        axs[0][0].imshow([[0, 1, 1], [0, 1, 2]])
+        axs[1][0].imshow([[0, 1, 1], [0, 1, 2]])
+        axs[0][1].imshow([[0, 1, 1], [0, 1, 2]])
+        axs[1][1].imshow([[0, 1, 1], [0, 1, 2]])
+        axs[2][0].imshow([[0, 1, 1], [0, 1, 2]])
+        axs[2][1].imshow([[0, 1, 1], [0, 1, 2]])
 
-    best=RUC.best_image
+        x = RUC2.store_model_Lambda[i_spot]
+        y = RUC2.store_Imeas[i_spot]
+        x1 = RUC.store_model_Lambda[i_spot]
+        y1 = RUC.store_Imeas[i_spot]
+        x0 = RUC.store_init_model_Lambda[i_spot]
+        y0 = RUC.store_init_Imeas[i_spot]
+      
+        vmin = RUC2.store_vmin[i_spot]
+        vmax = RUC2.store_vmax[i_spot]
+        vmin1 = RUC.store_vmin[i_spot]
+        vmax1 = RUC.store_vmax[i_spot]
+        vmin0 = RUC.store_init_vmin[i_spot]
+        vmax0 = RUC.store_init_vmax[i_spot]
+        axs[0][0].images[0].set_data(x0)
+        axs[1][0].images[0].set_data(x1)
+        axs[2][0].images[0].set_data(x)
+
+        axs[0][1].images[0].set_data(y0)
+        axs[1][1].images[0].set_data(y1)
+        axs[2][1].images[0].set_data(y)
+
+        axs[0][0].images[0].set_clim(vmin0, vmax0)
+        axs[1][0].images[0].set_clim(vmin1, vmax1)
+        axs[2][0].images[0].set_clim(vmin, vmax)
+
+        axs[0][1].images[0].set_clim(vmin0, vmax0)
+        axs[1][1].images[0].set_clim(vmin1, vmax1)
+        axs[2][1].images[0].set_clim(vmin, vmax)
+
+        axs[0][0].set_title('Before Refinement: Calc')
+        axs[1][0].set_title('Stage 1 Refinement: Calc')
+        axs[2][0].set_title('Final Refinement: Calc')
+
+        axs[0][1].set_title('Observation')
+        axs[1][1].set_title('Observation')
+        axs[2][1].set_title('Observation')
+        plt.suptitle("Spot number = %d at %.2f resolution"%(i_spot,RUC2.spot_resolution[i_spot]))
+      plt.show()
+
+    best=RUC2.best_image
     C2 = deepcopy(C)
-    ang, ax = RUC.get_correction_misset(as_axis_angle_deg=True)
+    ang, ax = RUC2.get_correction_misset(as_axis_angle_deg=True)
     C2.rotate_around_origin(ax, ang)
-    C2.set_B(RUC.get_refined_Bmatrix())
+    C2.set_B(RUC2.get_refined_Bmatrix())
       
 
     # refined unit cell parameters
