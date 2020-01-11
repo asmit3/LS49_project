@@ -49,7 +49,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     #ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'LS49_real_data2')
        
     #os.chdir(ls49_data_dir)
-    GAIN = 0.46
+    GAIN = 0.75
     loader = dxtbx.load(os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp))
     img = loader.get_raw_data().as_numpy_array() / GAIN
     exp_list = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_refined.expt'%tstamp), check_format=False)
@@ -154,8 +154,8 @@ if __name__ == "__main__":
                               '20180501143701853'] # Does not work
 
 
-    ts = timestamps_of_interest[7]
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=30, resmin=2.3, resmax=4.0)
+    ts = timestamps_of_interest[-9]
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=30, resmin=2.5, resmax=4.0)
 
     C = data["dxcrystal"]
     D = data["dxdetector"]
@@ -336,15 +336,18 @@ if __name__ == "__main__":
 
     print("Done.")
     print("Refined scale =%f", RUC.x[-1])
+    show_pixel_values=False
     if True:
       for i_spot in range(RUC2.n_spots):
-        fig, axs = plt.subplots(3,2)
+        fig, axs = plt.subplots(4,2)
         axs[0][0].imshow([[0, 1, 1], [0, 1, 2]])
         axs[1][0].imshow([[0, 1, 1], [0, 1, 2]])
         axs[0][1].imshow([[0, 1, 1], [0, 1, 2]])
         axs[1][1].imshow([[0, 1, 1], [0, 1, 2]])
         axs[2][0].imshow([[0, 1, 1], [0, 1, 2]])
         axs[2][1].imshow([[0, 1, 1], [0, 1, 2]])
+        axs[3][0].imshow([[0, 1, 1], [0, 1, 2]]) # before
+        axs[3][1].imshow([[0, 1, 1], [0, 1, 2]]) # after
 
         x = RUC2.store_model_Lambda[i_spot]
         y = RUC2.store_Imeas[i_spot]
@@ -352,6 +355,8 @@ if __name__ == "__main__":
         y1 = RUC.store_Imeas[i_spot]
         x0 = RUC.store_init_model_Lambda[i_spot]
         y0 = RUC.store_init_Imeas[i_spot]
+        deltaI0 = np.abs(x0-y0)
+        deltaI = np.abs(x-y)
       
         vmin = RUC2.store_vmin[i_spot]
         vmax = RUC2.store_vmax[i_spot]
@@ -362,14 +367,27 @@ if __name__ == "__main__":
         axs[0][0].images[0].set_data(x0)
         axs[1][0].images[0].set_data(x1)
         axs[2][0].images[0].set_data(x)
+        axs[3][0].images[0].set_data(deltaI0)
 
         axs[0][1].images[0].set_data(y0)
         axs[1][1].images[0].set_data(y1)
         axs[2][1].images[0].set_data(y)
+        axs[3][1].images[0].set_data(deltaI)
 
         axs[0][0].images[0].set_clim(vmin0, vmax0)
         axs[1][0].images[0].set_clim(vmin1, vmax1)
         axs[2][0].images[0].set_clim(vmin, vmax)
+        # Stuff just for deltaI
+        m = deltaI0[deltaI0 > 1e-9].mean()
+        s = deltaI0[deltaI0 > 1e-9].std()
+        dvmax = m+5*s
+        dvmin = m-s
+        axs[3][0].images[0].set_clim(dvmin, dvmax)
+        m = deltaI[deltaI > 1e-9].mean()
+        s = deltaI[deltaI > 1e-9].std()
+        dvmax = m+5*s
+        dvmin = m-s
+        axs[3][1].images[0].set_clim(dvmin, dvmax)
 
         axs[0][1].images[0].set_clim(vmin0, vmax0)
         axs[1][1].images[0].set_clim(vmin1, vmax1)
@@ -378,11 +396,26 @@ if __name__ == "__main__":
         axs[0][0].set_title('Before Refinement: Calc')
         axs[1][0].set_title('Stage 1 Refinement: Calc')
         axs[2][0].set_title('Final Refinement: Calc')
+        axs[3][0].set_title('Initial difference image')
 
         axs[0][1].set_title('Observation')
         axs[1][1].set_title('Observation')
         axs[2][1].set_title('Observation')
+        axs[3][1].set_title('Final difference image')
+
         plt.suptitle("Spot number = %d at %.2f resolution"%(i_spot,RUC2.spot_resolution[i_spot]))
+        if show_pixel_values:
+          ds=3
+          df=3
+          smax=np.argmax(x0)//x0.shape[0]
+          fmax=np.argmax(x0)%x0.shape[0]
+          if smax-ds < 0 or smax +ds >= x0.shape[0]:
+            ds=0
+          if fmax-df <0 or fmax+df >= x0.shape[1]:
+            df=0
+          for s in range(smax-ds, smax+ds):
+            for f in range(fmax-df, fmax+df):
+              text=axs[0][0].text(f,s, int(x0[s,f]), ha="center", va="center", color="w")
       plt.show()
 
     best=RUC2.best_image
