@@ -27,6 +27,8 @@ def strong_spot_mask(refl_tbl, img_size):
 def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
                             Nstrongest = 30,
                             resmax=12.0, resmin=3.0,
+                            #mtz_file='mysf.mtz',
+                            #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
                             mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             ls49_data_dir=None):
     import os, pickle, numpy as np
@@ -46,6 +48,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     if LS49_regression is None:
       raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
     ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_LS49_regression_r0222')
+    #ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'r0222')
     #ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'LS49_real_data2')
        
     #os.chdir(ls49_data_dir)
@@ -107,6 +110,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
 
     M = mtz.object(os.path.join(ls49_data_dir,mtz_file))
+    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
     sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
@@ -130,64 +134,33 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
-    timestamps_of_interest = [
-                              '20180501143547850',
-                              '20180501143545684',
-                              '20180501143641996',
-                              '20180501143545184',
-                              '20180501143628303',
-                              '20180501143602713',
-                              '20180501143546817',
-                              '20180501143651959',
-                              '20180501143631101',
-                              '20180501143546717',
-                              '20180501143620206',
-                              '20180501143546017',
-                              '20180501143552248',
-                              '20180501143651292',
-                              '20180501143626270',
-                              '20180501143652325',
-                              '20180501143625171',
-                              '20180501143549949',
-                              '20180501143648827',
-                              '20180501143620239',
-                              '20180501143546983',
-                              '20180501143606545',
-                              '20180501143549216',
-                              '20180501143533988',
-                              '20180501143643462',
-                              '20180501143548650',
-                              '20180501143628902',
-                              '20180501143643662',
-                              '20180501143546883',
-                              '20180501143535254',
-                              '20180501143547150',
-                              '20180501143549416',
-                              '20180501143701853',
-                              '20180501143603279',
-                              '20180501143657722',
-                              '20180501143632300',
-                              '20180501143651092',
-                              '20180501143640763',
-                              '20180501143628702',
-                              '20180501143631568',
-                              '20180501143551715',
-                              '20180501143533955',
-                              '20180501143631201',
-                              '20180501143547483',
-                              '20180501143549183',
-                              '20180501143648193',
-                              '20180501143559313',
-                              '20180501143630268',
-                              '20180501143641130',
-                              '20180501143555114',
-                              '20180501143645328',
-                              '20180501143650626',
-                              '20180501143631168',
-                              '20180501143553215']
+    # Initial r0222 regression
+    timestamps_of_interest = ['20180501143533988', # bad
+                              '20180501143546717', # bad --> blows up
+                              '20180501143546817', # looks ok
+                              '20180501143547150', # does not work
+                              '20180501143548650', # blows up
+                              '20180501143549416', # does not seem to work
+                              '20180501143549949', # Look ok !
+                              '20180501143551715', # does not work
+                              '20180501143555114', # seems to get 50% of the spots
+                              '20180501143559313', # does not work
+                              '20180501143602713', # does not work
+                              '20180501143606545', # diverges
+                              '20180501143620206', # diverges it seems although does not crash 
+                              '20180501143625171', # diverges, not sure why ?
+                              '20180501143628702', # fails with assertion error in curvatures. Did not look good till then
+                              '20180501143628902', # Looks good actually
+                              '20180501143631168', # Failes with assertion error in curvatures like above. did not look good
+                              '20180501143632300', # Looks good 
+                              '20180501143640763', # Looks good
+                              '20180501143643462', # meehhh
+                              '20180501143643662', # Looks OK
+                              '20180501143652325', # curvature assertion error, looked good till then
+                              '20180501143701853'] # Does not work
 
-    ts = timestamps_of_interest[2]
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=30, resmin=2.5, resmax=4.0)
+    ts = timestamps_of_interest[7]
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=30, resmin=2.5, resmax=4.5)
 
     C = data["dxcrystal"]
     D = data["dxdetector"]
@@ -514,6 +487,64 @@ AssertionError
                               '20180501143643662', # Looks OK
                               '20180501143652325', # curvature assertion error, looked good till then
                               '20180501143701853'] # Does not work
+
+
+    timestamps_of_interest = [
+                              '20180501143547850',
+                              '20180501143545684',
+                              '20180501143641996',
+                              '20180501143545184',
+                              '20180501143628303',
+                              '20180501143602713',
+                              '20180501143546817',
+                              '20180501143651959',
+                              '20180501143631101',
+                              '20180501143546717',
+                              '20180501143620206',
+                              '20180501143546017',
+                              '20180501143552248',
+                              '20180501143651292',
+                              '20180501143626270',
+                              '20180501143652325',
+                              '20180501143625171',
+                              '20180501143549949',
+                              '20180501143648827',
+                              '20180501143620239',
+                              '20180501143546983',
+                              '20180501143606545',
+                              '20180501143549216',
+                              '20180501143533988',
+                              '20180501143643462',
+                              '20180501143548650',
+                              '20180501143628902',
+                              '20180501143643662',
+                              '20180501143546883',
+                              '20180501143535254',
+                              '20180501143547150',
+                              '20180501143549416',
+                              '20180501143701853',
+                              '20180501143603279',
+                              '20180501143657722',
+                              '20180501143632300',
+                              '20180501143651092',
+                              '20180501143640763',
+                              '20180501143628702',
+                              '20180501143631568',
+                              '20180501143551715',
+                              '20180501143533955',
+                              '20180501143631201',
+                              '20180501143547483',
+                              '20180501143549183',
+                              '20180501143648193',
+                              '20180501143559313',
+                              '20180501143630268',
+                              '20180501143641130',
+                              '20180501143555114',
+                              '20180501143645328',
+                              '20180501143650626',
+                              '20180501143631168',
+                              '20180501143553215']
+
 '''
 
 
