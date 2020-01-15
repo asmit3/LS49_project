@@ -1,0 +1,969 @@
+{
+  "__id__": "ExperimentList", 
+  "experiment": [
+    {
+      "__id__": "Experiment", 
+      "identifier": "", 
+      "beam": 0, 
+      "detector": 0, 
+      "imageset": 0
+    }
+  ], 
+  "imageset": [
+    {
+      "__id__": "ImageSet", 
+      "images": [
+        "/reg/data/ana04/mfx/mfxls4916/scratch/asmit/LS49_2019/jungfrau_predictions_r0175-9/jungfrau_cbf/jungfrauhit_20180501102146130.cbf"
+      ], 
+      "mask": "", 
+      "gain": "", 
+      "pedestal": "", 
+      "dx": "", 
+      "dy": "", 
+      "params": {
+        "dynamic_shadowing": "Auto", 
+        "multi_panel": false
+      }
+    }
+  ], 
+  "profile": [], 
+  "crystal": [], 
+  "scan": [], 
+  "goniometer": [], 
+  "beam": [
+    {
+      "direction": [
+        0.0, 
+        0.0, 
+        1.0
+      ], 
+      "transmission": 1.0, 
+      "polarization_normal": [
+        0.0, 
+        1.0, 
+        0.0
+      ], 
+      "divergence": 0.0, 
+      "polarization_fraction": 0.999, 
+      "flux": 0.0, 
+      "sigma_divergence": 0.0, 
+      "wavelength": 1.7429438198653426
+    }
+  ], 
+  "scaling_model": [], 
+  "detector": [
+    {
+      "hierarchy": {
+        "origin": [
+          -260.5,
+           0.0,
+          -211.0
+        ], 
+        "fast_axis": [
+          2.220446049250313e-16, 
+          1.0, 
+          0.0
+        ], 
+        "name": "AXIS_L0M0_R", 
+        "raw_image_offset": [
+          0, 
+          0
+        ], 
+        "slow_axis": [
+          -1.0, 
+          2.2204460492503136e-16, 
+          0.0
+        ], 
+        "material": "", 
+        "mask": [], 
+        "thickness": 0.0, 
+        "mu": 0.0, 
+        "gain": 1.0, 
+        "trusted_range": [
+          0.0, 
+          0.0
+        ], 
+        "image_size": [
+          0, 
+          0
+        ], 
+        "px_mm_strategy": {
+          "type": "SimplePxMmStrategy"
+        }, 
+        "pedestal": 0.0, 
+        "identifier": "", 
+        "type": "", 
+        "children": [
+          {
+            "origin": [
+              0.0, 
+              20.625, 
+              4.93038065763e-32
+            ], 
+            "fast_axis": [
+              1.0, 
+              0.0, 
+              0.0
+            ], 
+            "name": "AXIS_L0M0_L1M0", 
+            "raw_image_offset": [
+              0, 
+              0
+            ], 
+            "slow_axis": [
+              0.0, 
+              1.0, 
+              0.0
+            ], 
+            "material": "", 
+            "mask": [], 
+            "thickness": 0.0, 
+            "mu": 0.0, 
+            "gain": 1.0, 
+            "trusted_range": [
+              0.0, 
+              0.0
+            ], 
+            "image_size": [
+              0, 
+              0
+            ], 
+            "px_mm_strategy": {
+              "type": "SimplePxMmStrategy"
+            }, 
+            "pedestal": 0.0, 
+            "identifier": "", 
+            "type": "", 
+            "children": [
+              {
+                "panel": 0
+              }, 
+              {
+                "panel": 1
+              }, 
+              {
+                "panel": 2
+              }, 
+              {
+                "panel": 3
+              }, 
+              {
+                "panel": 4
+              }, 
+              {
+                "panel": 5
+              }, 
+              {
+                "panel": 6
+              }, 
+              {
+                "panel": 7
+              }
+            ], 
+            "pixel_size": [
+              0.0, 
+              0.0
+            ]
+          }, 
+          {
+            "origin": [
+              0.0, 
+              -20.625, 
+              4.93038065763e-32
+            ], 
+            "fast_axis": [
+              1.0, 
+              0.0, 
+              0.0
+            ], 
+            "name": "AXIS_L0M0_L1M1", 
+            "raw_image_offset": [
+              0, 
+              0
+            ], 
+            "slow_axis": [
+              0.0, 
+              1.0, 
+              0.0
+            ], 
+            "material": "", 
+            "mask": [], 
+            "thickness": 0.0, 
+            "mu": 0.0, 
+            "gain": 1.0, 
+            "trusted_range": [
+              0.0, 
+              0.0
+            ], 
+            "image_size": [
+              0, 
+              0
+            ], 
+            "px_mm_strategy": {
+              "type": "SimplePxMmStrategy"
+            }, 
+            "pedestal": 0.0, 
+            "identifier": "", 
+            "type": "", 
+            "children": [
+              {
+                "panel": 8
+              }, 
+              {
+                "panel": 9
+              }, 
+              {
+                "panel": 10
+              }, 
+              {
+                "panel": 11
+              }, 
+              {
+                "panel": 12
+              }, 
+              {
+                "panel": 13
+              }, 
+              {
+                "panel": 14
+              }, 
+              {
+                "panel": 15
+              }
+            ], 
+            "pixel_size": [
+              0.0, 
+              0.0
+            ]
+          }
+        ], 
+        "pixel_size": [
+          0.0, 
+          0.0
+        ]
+      }, 
+      "panels": [
+        {
+          "origin": [
+            1.3874999999999955, 
+            17.9625, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_0", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            1.3874999999999975, 
+            -1.387499999999999, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_1", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            1.3874999999999995, 
+            -20.7375, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_2", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            1.3875000000000013, 
+            -40.0875, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_3", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            20.737499999999997, 
+            17.962499999999995, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_4", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            20.7375, 
+            -1.3874999999999982, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_5", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            20.7375, 
+            -20.7375, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_6", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            20.737500000000004, 
+            -40.0875, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_7", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            -39.862500000000004, 
+            59.212500000000006, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_8", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            -39.8625, 
+            39.8625, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_9", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            -39.8625, 
+            20.5125, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_10", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            -39.8625, 
+            1.162499999999996, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_11", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            -20.512500000000006, 
+            59.2125, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_12", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            -20.5125, 
+            39.8625, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_13", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            -20.5125, 
+            20.5125, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_14", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }, 
+        {
+          "origin": [
+            -20.5125, 
+            1.1625000000000003, 
+            1.4210854715202004e-14
+          ], 
+          "fast_axis": [
+            6.123233995736772e-17, 
+            -1.0, 
+            0.0
+          ], 
+          "name": "ARRAY_PANEL_15", 
+          "raw_image_offset": [
+            0, 
+            0
+          ], 
+          "slow_axis": [
+            1.0, 
+            6.123233995736762e-17, 
+            -1.2246467991499998e-16
+          ], 
+          "material": "", 
+          "mask": [], 
+          "thickness": 0.0, 
+          "mu": 0.0, 
+          "gain": 1.0, 
+          "trusted_range": [
+            -1.0, 
+            2000000.0
+          ], 
+          "image_size": [
+            256, 
+            256
+          ], 
+          "px_mm_strategy": {
+            "type": "SimplePxMmStrategy"
+          }, 
+          "pedestal": 0.0, 
+          "identifier": "", 
+          "type": "", 
+          "pixel_size": [
+            0.075, 
+            0.075
+          ]
+        }
+      ]
+    }
+  ]
+}
