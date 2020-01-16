@@ -9,8 +9,8 @@ LS49_regression= libtbx.env.find_in_repositories(
         relative_path="LS49_regression",
         test=os.path.isdir)
 diffBragg_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_LS49_regression_r0222')
-rayonix_expt=ExperimentListFactory.from_json_file(os.path.join(diffBragg_dir,'rayonix_expt/idx-'+ts+'_integrated_experiments.json'))
-jungfrau_det=ExperimentListFactory.from_json_file('rotated_plus_90.json')
+rayonix_expt=ExperimentListFactory.from_json_file(os.path.join(diffBragg_dir,'rayonix_expt/idx-'+ts+'_integrated.expt'), check_format=False)
+jungfrau_det=ExperimentListFactory.from_json_file('rotated_plus_90.json', check_format=False)
 jungfrau_cbf_expt = ExperimentListFactory.from_filenames([os.path.join(diffBragg_dir, 'jungfrau_cbf/jungfrauhit_'+ts+'.cbf')])
 #rayonix_expt[0].detector=jungfrau_det[0].detector
 

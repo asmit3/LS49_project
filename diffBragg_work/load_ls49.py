@@ -27,9 +27,9 @@ def strong_spot_mask(refl_tbl, img_size):
 def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
                             Nstrongest = 30,
                             resmax=12.0, resmin=3.0,
-                            #mtz_file='mysf.mtz',
+                            mtz_file='mysf.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
+                            #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             ls49_data_dir=None):
     import os, pickle, numpy as np
     from scipy.interpolate import interp1d
@@ -73,6 +73,10 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     #refls = refls.select(snr > snr[order[Nstrongest]])
     snr2 = refls['intensity.sum.value'] / flex.sqrt(refls['intensity.sum.variance'])
 
+    # Now select only the highest resolution spots upto Nstrongest
+    sorted_indices_by_resolution = flex.sort_permutation(refls['d'], reverse=False)
+    refls = refls.select(sorted_indices_by_resolution[0:Nstrongest])
+
     bboxes = [list(refls['shoebox'][i].bbox)[:4] for i in range(len(refls)) ]
     resolutions = [D[0].get_resolution_at_pixel(B.get_s0(), refls[i]['xyzobs.px.value'][0:2]) for i in range(len(refls))]
     bboxes = np.array(bboxes)
@@ -110,8 +114,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
 
     M = mtz.object(os.path.join(ls49_data_dir,mtz_file))
-    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
-    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
+    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
+    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
@@ -126,7 +130,7 @@ if __name__ == "__main__":
     from simtbx.diffBragg.refiners.crystal_systems import MonoclinicManager
     from simtbx.diffBragg import nanoBragg_crystal, nanoBragg_beam
     from copy import deepcopy
-    from dxtbx.model.experiment_list import Experiment, ExperimentList
+    from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
 
     parser = ArgumentParser()
     parser.add_argument("--plot", action='store_true')
@@ -159,8 +163,8 @@ if __name__ == "__main__":
                               '20180501143652325', # curvature assertion error, looked good till then
                               '20180501143701853'] # Does not work
 
-    ts = timestamps_of_interest[7]
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=30, resmin=2.5, resmax=4.5)
+    ts = timestamps_of_interest[1]
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=11, resmin=2.0, resmax=13.5)
 
     C = data["dxcrystal"]
     D = data["dxdetector"]
@@ -195,7 +199,50 @@ if __name__ == "__main__":
     nbbeam.unit_s0 = B.get_unit_s0()
     nbbeam.spectrum = data["spectrum"]
 
+
+
+
+
+
+    if False:
+      D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
+
+      nbcryst_final = nanoBragg_crystal.nanoBragg_crystal()
+      nbcryst_final.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
+      nbcryst_final.mos_spread_deg = mos_spread_deg
+      nbcryst_final.n_mos_domains = n_mos_domains
+      nbcryst_final.thick_mm = 0.005
+      nbcryst_final.miller_array = data["sfall"]
+      nbcryst_final.dxtbx_crystal = C
+
+      SIM_jung = SimData()
+      SIM_jung.crystal = nbcryst_final
+      SIM_jung.detector = D_jung
+      SIM_jung.beam = nbbeam
+
+      SIM_jung.instantiate_diffBragg(adc_offset=0,
+                                oversample=0,
+                                interpolate=0,
+                                verbose=0)
+      SIM_jung.D.show_params()
+      SIM_jung.D.spot_scale = 1e6 # to guide your eye
+      SIM_jung.panel_id = 0
+      SIM_jung.D.add_diffBragg_spots()
+      img=SIM_jung.D.raw_pixels.as_numpy_array()
+      from IPython import embed; embed(); exit()
+      import matplotlib.pyplot as plt
+      m = img[img>1.e-9].mean()
+      s = img[img>1.e-9].std()
+      vmin = 0
+      vmax = m+5*s
+      plt.imshow(img)
+      plt.show()
+      exit()
+
+
     SIM = SimData()
+    # maybe make Ncells very small e.g. 5x5x5
+    #nbcryst.Ncells_abc (5,5,5)
     SIM.crystal = nbcryst
     SIM.detector = D
     SIM.beam = nbbeam
@@ -205,6 +252,10 @@ if __name__ == "__main__":
                               interpolate=0,
                               verbose=0)
     SIM.D.show_params()
+    #SIM.D.spot_scale = 1e6 # to guide your eye
+    #SIM.panel_id = 0
+    #SIM.D.add_diffBragg_spots()
+    #img=SIM.D.raw_pixels.as_numopy_array()
 
     ucell = C.get_unit_cell().parameters()
     UcellMan = MonoclinicManager(a=ucell[0], b=ucell[1], c=ucell[2], beta=ucell[4]*np.pi / 180.)
@@ -446,6 +497,36 @@ if __name__ == "__main__":
                          crystal=C2)
     dump_explist = ExperimentList([exp])
     dump_explist.as_file('after_refinement_%s.expt'%ts)
+
+
+    # Now display prediction on jungfrau
+    if True:
+      D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
+
+      nbcryst_final = nanoBragg_crystal.nanoBragg_crystal()
+      nbcryst_final.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
+      nbcryst_final.mos_spread_deg = mos_spread_deg
+      nbcryst_final.n_mos_domains = n_mos_domains
+      nbcryst_final.thick_mm = 0.005
+      nbcryst_final.miller_array = data["sfall"]
+      nbcryst_final.dxtbx_crystal = C2
+
+      SIM_jung = SimData()
+      SIM_jung.crystal = nbcryst_final
+      SIM_jung.detector = D_jung
+      SIM_jung.beam = nbbeam
+
+      SIM_jung.instantiate_diffBragg(adc_offset=0,
+                                oversample=0,
+                                interpolate=0,
+                                verbose=0)
+      SIM_jung.D.show_params()
+      SIM_jung.D.spot_scale = 1e6 # to guide your eye
+      SIM_jung.panel_id = 0
+      SIM_jung.D.add_diffBragg_spots()
+      img=SIM_jung.D.raw_pixels.as_numpy_array()
+      from IPython import embed; embed(); exit()
+
     exit()
 
 ### Error message
