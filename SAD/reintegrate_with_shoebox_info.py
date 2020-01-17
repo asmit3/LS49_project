@@ -192,7 +192,6 @@ class Script(object):
 
             iterable = list(zip(tags, all_refined_expt_files, all_indexed_refl_files))
 
-        import pdb; pdb.set_trace()
         # Process the data
         if params.mp.method == "mpi":
             from mpi4py import MPI
