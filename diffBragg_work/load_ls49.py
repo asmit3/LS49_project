@@ -100,8 +100,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,'fee_data_r0222.pickle'), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max_energy - 15
-    max_energy_interpol = max_energy + 15
+    min_energy_interpol = max_energy - 5
+    max_energy_interpol = max_energy + 5
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
@@ -204,11 +204,12 @@ if __name__ == "__main__":
 
 
 
-    if False:
-      D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
+    if True:
+      D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/fake_jungfrau_from_rayonix.expt', check_format=False)[0].detector
+      #D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
 
       nbcryst_final = nanoBragg_crystal.nanoBragg_crystal()
-      nbcryst_final.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
+      nbcryst_final.Ncells_abc = 5,5,5 #Ncells_abc, Ncells_abc, Ncells_abc
       nbcryst_final.mos_spread_deg = mos_spread_deg
       nbcryst_final.n_mos_domains = n_mos_domains
       nbcryst_final.thick_mm = 0.005
@@ -216,7 +217,7 @@ if __name__ == "__main__":
       nbcryst_final.dxtbx_crystal = C
 
       SIM_jung = SimData()
-      SIM_jung.crystal = nbcryst_final
+      SIM_jung.crystal = nbcryst
       SIM_jung.detector = D_jung
       SIM_jung.beam = nbbeam
 
@@ -229,13 +230,15 @@ if __name__ == "__main__":
       SIM_jung.panel_id = 0
       SIM_jung.D.add_diffBragg_spots()
       img=SIM_jung.D.raw_pixels.as_numpy_array()
-      from IPython import embed; embed(); exit()
       import matplotlib.pyplot as plt
       m = img[img>1.e-9].mean()
       s = img[img>1.e-9].std()
-      vmin = 0
-      vmax = m+5*s
-      plt.imshow(img)
+      vmin = 1
+      vmax = 1000 #m+5*s
+      #from IPython import embed; embed(); exit()
+      plt.imshow(img, vmax=vmax, vmin=vmin)
+      plt.show()
+      plt.imshow(img, vmax=vmax, vmin=vmin)
       plt.show()
       exit()
 
