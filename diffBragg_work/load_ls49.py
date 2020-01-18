@@ -27,7 +27,7 @@ def strong_spot_mask(refl_tbl, img_size):
 def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
                             Nstrongest = 30,
                             resmax=12.0, resmin=3.0,
-                            mtz_file='mysf.mtz',
+                            mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             ls49_data_dir=None):
@@ -47,7 +47,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         test=os.path.isdir)
     if LS49_regression is None:
       raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
-    ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_LS49_regression_r0222')
+    ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_r0222_cori', 'rayonix_expt')
+    #ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_LS49_regression_r0222')
     #ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'r0222')
     #ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'LS49_real_data2')
        
@@ -85,7 +86,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_indexed.refl'%tstamp))
     strong_mask = strong_spot_mask(refl_tbl=R2, img_size=img.shape)
     is_bg_pixel = np.logical_not(strong_mask)
-    is_BAD_pixel = np.logical_not(pickle.load(open(os.path.join(ls49_data_dir,'mask_r4.pickle'), 'r'))[0].as_numpy_array())
+    is_BAD_pixel = np.logical_not(pickle.load(open(os.path.join(ls49_data_dir,'../','mask_r4.pickle'), 'r'))[0].as_numpy_array())
     is_bg_pixel[is_BAD_pixel] = False
     num_spots = len(refls)
     tilt_abc = np.zeros((num_spots, 3))
@@ -97,7 +98,9 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         tilts.append(tilt)
         tilt_abc[i_spot] = (coeff[1], coeff[2], coeff[0])
 
-    chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,'fee_data_r0222.pickle'), 'r'))[tstamp]).T
+    fee_file='idx-fee_data_%s.pickle'%tstamp
+    #from IPython import embed; embed(); exit()
+    chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
     min_energy_interpol = max_energy - 5
@@ -113,7 +116,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     #M = mtz.object('ls49_oxy_2.5_s0_mark0.mtz')
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
 
-    M = mtz.object(os.path.join(ls49_data_dir,mtz_file))
+    M = mtz.object(os.path.join(ls49_data_dir,'../',mtz_file))
     sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
     sfall = sfall.as_amplitude_array()
@@ -163,8 +166,8 @@ if __name__ == "__main__":
                               '20180501143652325', # curvature assertion error, looked good till then
                               '20180501143701853'] # Does not work
 
-    ts = timestamps_of_interest[1]
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=11, resmin=2.0, resmax=13.5)
+    ts = timestamps_of_interest[7]
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.0, resmax=13.5)
 
     C = data["dxcrystal"]
     D = data["dxdetector"]
@@ -204,7 +207,7 @@ if __name__ == "__main__":
 
 
 
-    if True:
+    if False:
       D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/fake_jungfrau_from_rayonix.expt', check_format=False)[0].detector
       #D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
 
