@@ -26,6 +26,9 @@ LS49_diffBragg_phil_str='''
     plot = False
       .type = bool
       .help = Flag to indicate if plotting will be used.
+    Deff = 1000.0
+      .type = float
+      .help = Mosaic domain size initial estimate, will be refined eventually
 }
 '''
 phil_scope = parse(LS49_diffBragg_phil_str)
@@ -121,20 +124,22 @@ class Script(object):
     D = data["dxdetector"]
     B = data["dxbeam"]
     exp=data['experiment']
-    dump_exp = Experiment(imageset=exp.imageset, 
+    indexed_reflections = deepcopy(data['indexed_reflections'])
+    dump_exp = Experiment(imageset=data['cbf_imageset'], 
                          beam=B,
                          detector=D,
                          goniometer=exp.goniometer,
                          scan=exp.scan,
                          crystal=C)
-    dump_explist = ExperimentList([exp])
+    dump_explist = ExperimentList([dump_exp])
     dump_explist.as_file('before_refinement_%s.expt'%ts)
+    indexed_reflections.as_file('before_refinement_%s.refl'%ts)
 
     # Some global variables here for LS49
     mos_spread_deg=0.01
     n_mos_domains=1
     a,b,c,_,_,_ = C.get_unit_cell().parameters()
-    Deff = 1000
+    Deff = self.params.LS49_diffBragg.Deff
     Ncells_abc = np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
     nbcryst = nanoBragg_crystal.nanoBragg_crystal()
     nbcryst.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
@@ -273,14 +278,23 @@ class Script(object):
     print("")
 
     C2.show()
-    dump_exp = Experiment(imageset=exp.imageset, 
+    dump_exp = Experiment(imageset=data['cbf_imageset'], 
                          beam=B,
                          detector=D,
                          goniometer=exp.goniometer,
                          scan=exp.scan,
                          crystal=C2)
-    dump_explist = ExperimentList([exp])
+    dump_explist = ExperimentList([dump_exp])
     dump_explist.as_file('after_refinement_%s.expt'%ts)
+    # Dump refl file as well based on prediction from refined model
+    if True:
+      from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
+      ref_predictor = ExperimentsPredictorFactory.from_experiments(
+                      dump_explist,
+                      force_stills=True,
+                      spherical_relp=False)
+      ref_predictor(indexed_reflections)
+      indexed_reflections.as_file('after_refinement_%s.refl'%ts)
 
 if __name__ == "__main__":
   try:

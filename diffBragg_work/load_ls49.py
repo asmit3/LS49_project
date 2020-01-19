@@ -51,6 +51,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
 
     GAIN = 0.75
     loader = dxtbx.load(os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp))
+    cbf_imageset = loader.get_imageset([os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)])
+    
     img = loader.get_raw_data().as_numpy_array() / GAIN
     exp_list = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_refined.expt'%tstamp), check_format=False)
     exp = exp_list[0]
@@ -117,7 +119,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
-            'mask': is_BAD_pixel, 'experiment':exp, 'resolution': resolutions}
+            'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset}
 
 
 if __name__ == "__main__":
@@ -162,20 +164,22 @@ if __name__ == "__main__":
                               '20180501143701853'] # Does not work
 
     ts = timestamps_of_interest[7]
+    ts='20180501143549183'
     data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.0, resmax=13.5)
-
     C = data["dxcrystal"]
     D = data["dxdetector"]
     B = data["dxbeam"]
     exp=data['experiment']
-    dump_exp = Experiment(imageset=exp.imageset, 
+    indexed_reflections = deepcopy(data['indexed_reflections'])
+    dump_exp = Experiment(imageset=data['cbf_imageset'], 
                          beam=B,
                          detector=D,
                          goniometer=exp.goniometer,
                          scan=exp.scan,
                          crystal=C)
-    dump_explist = ExperimentList([exp])
+    dump_explist = ExperimentList([dump_exp])
     dump_explist.as_file('before_refinement_%s.expt'%ts)
+    indexed_reflections.as_file('before_refinement_%s.refl'%ts)
 
     # Some global variables here for LS49
     mos_spread_deg=0.01
@@ -196,11 +200,6 @@ if __name__ == "__main__":
     nbbeam = nanoBragg_beam.nanoBragg_beam()
     nbbeam.unit_s0 = B.get_unit_s0()
     nbbeam.spectrum = data["spectrum"]
-
-
-
-
-
 
     if False:
       D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/fake_jungfrau_from_rayonix.expt', check_format=False)[0].detector
@@ -490,18 +489,27 @@ if __name__ == "__main__":
     print("")
 
     C2.show()
-    dump_exp = Experiment(imageset=exp.imageset, 
+    dump_exp = Experiment(imageset=data['cbf_imageset'], 
                          beam=B,
                          detector=D,
                          goniometer=exp.goniometer,
                          scan=exp.scan,
                          crystal=C2)
-    dump_explist = ExperimentList([exp])
+    dump_explist = ExperimentList([dump_exp])
     dump_explist.as_file('after_refinement_%s.expt'%ts)
+    # Dump refl file as well based on prediction from refined model
+    if True:
+      from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
+      ref_predictor = ExperimentsPredictorFactory.from_experiments(
+                      dump_explist,
+                      force_stills=True,
+                      spherical_relp=False)
+      ref_predictor(indexed_reflections)
+      indexed_reflections.as_file('after_refinement_%s.refl'%ts)
 
 
     # Now display prediction on jungfrau
-    if True:
+    if False:
       D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
 
       nbcryst_final = nanoBragg_crystal.nanoBragg_crystal()
@@ -526,7 +534,6 @@ if __name__ == "__main__":
       SIM_jung.panel_id = 0
       SIM_jung.D.add_diffBragg_spots()
       img=SIM_jung.D.raw_pixels.as_numpy_array()
-      from IPython import embed; embed(); exit()
 
     exit()
 
