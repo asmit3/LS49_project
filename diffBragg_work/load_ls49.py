@@ -45,14 +45,10 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
       LS49_regression = libtbx.env.find_in_repositories(
         relative_path="LS49_regression",
         test=os.path.isdir)
-    if LS49_regression is None:
-      raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
-    ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_r0222_cori', 'rayonix_expt')
-    #ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_LS49_regression_r0222')
-    #ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'r0222')
-    #ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'LS49_real_data2')
-       
-    #os.chdir(ls49_data_dir)
+      if LS49_regression is None:
+        raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
+      ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_r0222_cori', 'rayonix_expt')
+
     GAIN = 0.75
     loader = dxtbx.load(os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp))
     img = loader.get_raw_data().as_numpy_array() / GAIN
@@ -99,12 +95,11 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         tilt_abc[i_spot] = (coeff[1], coeff[2], coeff[0])
 
     fee_file='idx-fee_data_%s.pickle'%tstamp
-    #from IPython import embed; embed(); exit()
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max_energy - 5
-    max_energy_interpol = max_energy + 5
+    min_energy_interpol = max_energy - 15
+    max_energy_interpol = max_energy + 15
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)

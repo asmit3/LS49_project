@@ -4,37 +4,52 @@
 from __future__ import absolute_import, print_function, division 
 from libtbx.utils import Abort, Sorry
 from libtbx.phil import parse
+import sys, os
 
 from LS49_project.diffBragg_work.load_ls49 import strong_spot_mask, process_ls49_image_real
 
+help_message = ''' MPI version of load_ls49 script to distribute diffBragg jobs over several cores/nodes using MPI'''
+usage = "usage: libtbx.python script_name params.phil"
 
-LS49_diffBragg_phil_str = ''' 
-LS49_diffBragg {
-  timestamps_file = None
-    .type = str
-    .help = Path to filename that contains all timestamps to be processed \
-  rayonix_expt_path = None
-    .type = str
-    .help = Path to folder that contains all rayonix expt/refl files
-  output_dir = None
-    .type = str
-    .help = Path to output directory 
-  plot = False
-    .type = bool
-    .help = Flag to indicate if plotting will be used.
 
+LS49_diffBragg_phil_str=''' 
+  LS49_diffBragg {
+    timestamps_file = None
+      .type = str
+      .help = Path to filename that contains all timestamps to be processed
+    rayonix_expt_path = None
+      .type = str
+      .help = Path to folder that contains all rayonix expt/refl files
+    output_dir = None
+      .type = str
+      .help = Path to output directory 
+    plot = False
+      .type = bool
+      .help = Flag to indicate if plotting will be used.
 }
-
 '''
-phil_scope = parse(LS49_diffBragg_phil_str, process_includes=True)
+phil_scope = parse(LS49_diffBragg_phil_str)
+
+
+def params_from_phil(args):
+  user_phil = []
+  for arg in args:
+    if os.path.isfile(arg):
+      user_phil.append(parse(file_name=arg))
+    else:
+      try:
+        user_phil.append(parse(arg))
+      except Exception as e:
+        raise Sorry("Unrecognized argument: %s"%arg)
+  params = phil_scope.fetch(sources=user_phil).extract()
+  return params
 
 class Script(object):
   def __init__(self):
     """Initialise the script."""
     from dials.util.options import OptionParser
     import libtbx.load_env
-    # Create the parser
-    self.parser = OptionParser(usage=usage, phil=phil_scope, epilog=help_message)
+    self.params=params_from_phil(sys.argv[1:])
 
   def run(self):
     """Execute the script."""
@@ -43,14 +58,6 @@ class Script(object):
     from libtbx import easy_mp
     import copy
 
-    # Parse the command line
-    params, options, all_paths = self.parser.parse_args(
-        show_diff_phil=False, return_unhandled=True, quick_parse=True)
-
-    # Save the options
-    self.options = options
-    self.params = params
-
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -58,14 +65,46 @@ class Script(object):
     # Let rank 0 read in the timestamps to process and distribute the work
     if rank == 0:
       all_timestamps = []
-      with fin as open(self.params.LS49_diffBragg.timestamps_file, 'r'):
+      with open(self.params.LS49_diffBragg.timestamps_file, 'r') as fin:
         for line in fin:
           if line !='/n':
             all_timestamps.append(line.strip())
+      print ('Total number of timestamps = %d'%len(all_timestamps))
+      iterable = all_timestamps
     comm.Barrier()
-     
+    if rank == 0:
+      # server process
+      for item in iterable:
+        print("Getting next available process")
+        rankreq = comm.recv(source=MPI.ANY_SOURCE)
+        print("Process %s is ready, sending %s\n" % (rankreq, item))
+        comm.send(item, dest=rankreq)
+        # send a stop command to each process
+      print("MPI DONE, sending stops\n")
+      for rankreq in range(size - 1):
+        rankreq = comm.recv(source=MPI.ANY_SOURCE)
+        print("Sending stop to %d\n" % rankreq)
+        comm.send("endrun", dest=rankreq)
+      print("All stops sent.")
+    else:
+      # client process
+      while True:
+      # inform the server this process is ready for an event
+        print("Rank %d getting next task" % rank)
+        comm.send(rank, dest=0)
+        print("Rank %d waiting for response" % rank)
+        item = comm.recv(source=0)
+        if item == "endrun":
+          print("Rank %d received endrun" % rank)
+          break
+        print("Rank %d beginning processing" % rank)
+        try:
+          self.do_work(rank, [item])
+        except Exception as e:
+          print("Rank %d unhandled exception processing event" % rank,str(e))
+        print("Rank %d event processed" % rank)
 
-  def do_work(self, item_list=None)
+  def do_work(self, rank, item_list=None):
     from simtbx.diffBragg.refiners import RefineAll
     from simtbx.diffBragg.sim_data import SimData
     import numpy as np
@@ -74,13 +113,9 @@ class Script(object):
     from copy import deepcopy
     from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
 
-    # Initial r0222 regression
-    timestamps_of_interest = ['20180501143533988', # bad
-                              '20180501143701853'] # Does not work
-
-
-    ts = timestamps_of_interest[0]
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.0, resmax=13.5)
+    ts = item_list[0] 
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.0, resmax=13.5, ls49_data_dir=self.params.LS49_diffBragg.rayonix_expt_path)
+ 
 
     C = data["dxcrystal"]
     D = data["dxdetector"]
@@ -133,7 +168,7 @@ class Script(object):
         abc_init=data["tilt_abc"],
         img=data["data_img"],
         SimData_instance=SIM,
-        plot_images=args.plot,
+        plot_images=False,
         ucell_manager=UcellMan,
         init_gain=1,
         init_scale=1.0)
@@ -198,7 +233,7 @@ class Script(object):
         abc_init=data["tilt_abc"],
         img=data["data_img"],
         SimData_instance=SIM2,
-        plot_images=args.plot,
+        plot_images=False,
         ucell_manager=UcellMan,
         init_gain=1,
         init_scale=refined_scale)
