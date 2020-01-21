@@ -53,6 +53,10 @@ class Script(object):
     from dials.util.options import OptionParser
     import libtbx.load_env
     self.params=params_from_phil(sys.argv[1:])
+    if self.params.LS49_diffBragg.output_dir is not None:
+      self.output_dir = self.params.LS49_diffBragg.output_dir
+    else:
+      self.output_dir = './'
 
   def run(self):
     """Execute the script."""
@@ -65,6 +69,16 @@ class Script(object):
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
+
+    # Set up logger for each rank
+    log_path = os.path.join(self.output_dir, "log_rank%04d.out"%rank)
+    error_path = os.path.join(self.output_dir, "error_rank%04d.out"%rank)
+    print("Redirecting stdout to %s"%log_path)
+    print("Redirecting stderr to %s"%error_path)
+    sys.stdout = open(log_path,'a', buffering=0)
+    sys.stderr = open(error_path,'a',buffering=0)
+    print("Should be redirected now")
+
     # Let rank 0 read in the timestamps to process and distribute the work
     if rank == 0:
       all_timestamps = []
@@ -132,8 +146,8 @@ class Script(object):
                          scan=exp.scan,
                          crystal=C)
     dump_explist = ExperimentList([dump_exp])
-    dump_explist.as_file('before_refinement_%s.expt'%ts)
-    indexed_reflections.as_file('before_refinement_%s.refl'%ts)
+    dump_explist.as_file(os.path.join(self.output_dir, 'before_refinement_%s.expt'%ts))
+    indexed_reflections.as_file(os.path.join(self.output_dir, 'before_refinement_%s.refl'%ts))
 
     # Some global variables here for LS49
     mos_spread_deg=0.01
@@ -285,7 +299,7 @@ class Script(object):
                          scan=exp.scan,
                          crystal=C2)
     dump_explist = ExperimentList([dump_exp])
-    dump_explist.as_file('after_refinement_%s.expt'%ts)
+    dump_explist.as_file(os.path.join(self.output_dir, 'after_refinement_%s.expt'%ts))
     # Dump refl file as well based on prediction from refined model
     if True:
       from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
@@ -294,7 +308,7 @@ class Script(object):
                       force_stills=True,
                       spherical_relp=False)
       ref_predictor(indexed_reflections)
-      indexed_reflections.as_file('after_refinement_%s.refl'%ts)
+      indexed_reflections.as_file(os.path.join(self.output_dir, 'after_refinement_%s.refl'%ts))
 
 if __name__ == "__main__":
   try:
