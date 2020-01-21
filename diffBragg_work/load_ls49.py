@@ -80,6 +80,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     resolutions = [D[0].get_resolution_at_pixel(B.get_s0(), refls[i]['xyzobs.px.value'][0:2]) for i in range(len(refls))]
     bboxes = np.array(bboxes)
     bboxes[bboxes > 960] = 959
+    bboxes[bboxes < 0] = 0
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
     R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_indexed.refl'%tstamp))
     strong_mask = strong_spot_mask(refl_tbl=R2, img_size=img.shape)
@@ -164,7 +165,7 @@ if __name__ == "__main__":
                               '20180501143701853'] # Does not work
 
     ts = timestamps_of_interest[7]
-    ts='20180501143549183'
+    ts='20180501143546883'
     data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.0, resmax=13.5)
     C = data["dxcrystal"]
     D = data["dxdetector"]
@@ -232,7 +233,6 @@ if __name__ == "__main__":
       s = img[img>1.e-9].std()
       vmin = 1
       vmax = 1000 #m+5*s
-      #from IPython import embed; embed(); exit()
       plt.imshow(img, vmax=vmax, vmin=vmin)
       plt.show()
       plt.imshow(img, vmax=vmax, vmin=vmin)
