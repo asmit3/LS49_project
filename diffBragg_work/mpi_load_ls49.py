@@ -309,6 +309,8 @@ class Script(object):
                       spherical_relp=False)
       ref_predictor(indexed_reflections)
       indexed_reflections.as_file(os.path.join(self.output_dir, 'after_refinement_%s.refl'%ts))
+      # Also dump the RUC2 object for good measure
+      dump('RUC2_%s.pickle'%ts, RUC2)
 
 if __name__ == "__main__":
   try:

@@ -101,8 +101,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max_energy - 15
-    max_energy_interpol = max_energy + 15
+    min_energy_interpol = max_energy - 35
+    max_energy_interpol = max_energy + 35
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
@@ -165,7 +165,7 @@ if __name__ == "__main__":
                               '20180501143701853'] # Does not work
 
     ts = timestamps_of_interest[7]
-    ts='20180501143546883'
+    #ts='20180501143546883'
     data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.0, resmax=13.5)
     C = data["dxcrystal"]
     D = data["dxdetector"]
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     indexed_reflections.as_file('before_refinement_%s.refl'%ts)
 
     # Some global variables here for LS49
-    mos_spread_deg=0.01
+    mos_spread_deg=0.001
     n_mos_domains=1
     
 
@@ -216,7 +216,7 @@ if __name__ == "__main__":
 
       SIM_jung = SimData()
       SIM_jung.crystal = nbcryst
-      SIM_jung.detector = D_jung
+      SIM_jung.detector = D #D_jung
       SIM_jung.beam = nbbeam
 
       SIM_jung.instantiate_diffBragg(adc_offset=0,
@@ -522,7 +522,7 @@ if __name__ == "__main__":
 
       SIM_jung = SimData()
       SIM_jung.crystal = nbcryst_final
-      SIM_jung.detector = D_jung
+      SIM_jung.detector = D #D_jung
       SIM_jung.beam = nbbeam
 
       SIM_jung.instantiate_diffBragg(adc_offset=0,
@@ -534,7 +534,16 @@ if __name__ == "__main__":
       SIM_jung.panel_id = 0
       SIM_jung.D.add_diffBragg_spots()
       img=SIM_jung.D.raw_pixels.as_numpy_array()
-
+      import matplotlib.pyplot as plt
+      m = img[img>1.e-9].mean()
+      s = img[img>1.e-9].std()
+      vmin = 1
+      vmax = 1000 #m+5*s
+      plt.imshow(img, vmax=vmax, vmin=vmin)
+      plt.show()
+      plt.imshow(img, vmax=vmax, vmin=vmin)
+      plt.show()
+      exit()
     exit()
 
 ### Error message
