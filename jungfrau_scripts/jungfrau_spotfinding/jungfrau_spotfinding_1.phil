@@ -1,0 +1,67 @@
+# 1st set of params == 16/54 images with spots but performs poorly on the 4 spot image
+#spotfinder {
+#  filter {
+#    min_spot_size = 5
+#    d_min = 2
+#  }
+#  threshold {
+#    dispersion {
+#      gain = 1.0
+#      global_threshold = 100
+#    }
+#  }
+#}
+
+# 2nd set --> 18/54 images. Still not perfect on the 4 spot image but better
+#spotfinder {
+#  filter {
+#    min_spot_size = 5
+#    max_spot_size = 100
+#    d_min = None
+#    d_max = None
+#    max_separation=15
+#    max_strong_pixel_fraction=0.25
+#  }
+#  threshold {
+#    dispersion {
+#      gain = 6.0
+#      kernel_size=10 10
+#      sigma_background=6
+#      sigma_strong=3
+#      min_local=5
+#      global_threshold = 30
+#
+#    }
+#  }
+#}
+#
+spotfinder {
+  filter {
+    min_spot_size = 5
+    max_spot_size = 100
+    d_min = None
+    d_max = None
+    max_separation=20
+    max_strong_pixel_fraction=0.25
+  }
+  threshold {
+    dispersion {
+      gain = 6.0
+      kernel_size=10 10
+      sigma_background=6
+      sigma_strong=3
+      min_local=5
+      global_threshold = 30
+
+    }
+  }
+}
+
+
+
+spotfinder.lookup.mask='/reg/data/ana04/mfx/mfxls4916/scratch/asmit/LS49_2019/input/new_jungfrau_mask_panel13.pickle'
+output.output_dir=out
+output.logging_dir=out
+LS49.filter_close_spots=True
+LS49.filter_centroids_dist_px=20
+#mp.method=mpi
