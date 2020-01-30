@@ -54,6 +54,9 @@ phil_scope = parse('''
       .type = bool
       .help = flag to indicate whether you want to dump intermediate grid search files aka \
               refl/expt files from each prediction of each perturbed detector distance
+    critical_pixel_dist = 10
+      .type = float
+      .help = critical pixel distance used to evaluate whether prediction is close enough to a strong spot \
 }
 ''')
 
@@ -79,6 +82,7 @@ class GridSearch_Jungfrau(object):
   def __init__(self):
     # Read phil stuff
     self.params = params_from_phil(sys.argv[1:])
+    self.trial_result = [] # a list to store trial result evaluation
 
   def setup_grid(self):
     dx_mm = self.params.grid_search_jungfrau.dx_mm 
@@ -102,6 +106,7 @@ class GridSearch_Jungfrau(object):
       ts, strong_refl_f, imported_expt_f, integrated_rayonix_expt_f = item 
 
       strong_refl = flex.reflection_table.from_file(strong_refl_f)
+      if len(strong_refl) <self.params.grid_search_jungfrau.minimum_number_of_spots: continue 
       imported_expt = ExperimentListFactory.from_json_file(imported_expt_f)
       integrated_rayonix_expt = ExperimentListFactory.from_json_file(integrated_rayonix_expt_f, check_format=False)
 
@@ -117,6 +122,7 @@ class GridSearch_Jungfrau(object):
       s0 = col(d0.get_local_slow_axis())
       r0 = col(d0.get_local_origin())
       for dx in self.dx:
+        print ('Stage dx')
         for dy in self.dy:
           for dz in self.dz:
             imported_expt[0].detector=original_detector
@@ -131,7 +137,10 @@ class GridSearch_Jungfrau(object):
             predictor=StillsReflectionPredictor(imported_expt[0])
             ubx=predictor.for_ub(imported_expt[0].crystal.get_A())
             ubx['id']=flex.int(len(ubx),0)
-            print ('NUMBER OF PREDS=', len(ubx))
+            #print ('NUMBER OF PREDS=', len(ubx), ts, dx,dy,dz)
+#            if len(ubx) == len(strong_refl):
+#              print ('NUMBER OF PREDS=', len(ubx), ts, dx,dy,dz)
+            self.evaluate_trial(strong_refl, ubx, imported_expt[0].detector)
             if self.params.grid_search_jungfrau.dump_intermediate_files:
               imported_expt.as_file(os.path.join(self.params.grid_search_jungfrau.outdir, 'prediction_%s_%.2f_%.2f_%.2f.expt'%(ts,dx,dy,dz)))
               ubx.as_file(os.path.join(self.params.grid_search_jungfrau.outdir, 'prediction_%s_%.2f_%.2f_%.2f.refl'%(ts,dx,dy,dz)))
@@ -139,6 +148,23 @@ class GridSearch_Jungfrau(object):
 
   def evaluate_grid_search(self):
     pass
+
+  def evaluate_trial(self, strong_refl, predicted_refl, detector):
+    pixel_size = detector[0].get_pixel_size()[0]
+    count = 0
+    for ii, strong in enumerate(strong_refl.rows()):
+      for jj, predicted in enumerate(predicted_refl.rows()):
+        pstrong = detector[strong['panel']]
+        ppredicted = detector[predicted['panel']]
+        xyobs_px=strong['xyzobs.px.value'][0:2]
+        xypred_px = predicted['xyzcal.px'][0:2]
+        r_strong = col(pstrong.get_pixel_lab_coord(xyobs_px))
+        r_predicted = col(ppredicted.get_pixel_lab_coord(xypred_px))
+        dpx = (r_strong - r_predicted).length()/pixel_size
+        if dpx < self.params.grid_search_jungfrau.critical_pixel_dist:
+          count +=1
+    self.trial_result.append(count)
+    
 
   def run(self):
     # Figure out what data to process
@@ -188,7 +214,6 @@ class GridSearch_Jungfrau(object):
           self.do_work(rank, subset)
     else:
       self.do_work(0, iterable)
-
 
 if __name__ == '__main__':
   try:
