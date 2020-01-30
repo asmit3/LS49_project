@@ -1,0 +1,1 @@
+libtbx.python /reg/neh/home5/asmit/ExaFEL/dials/modules/LS49_project/jungfrau_scripts/jungfrau_grid_search_to_find_origin/jungfrau_grid_search_to_find_origin.py grid_search_params.phil 
