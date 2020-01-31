@@ -144,7 +144,8 @@ class GridSearch_Jungfrau(object):
             if self.params.grid_search_jungfrau.dump_intermediate_files:
               imported_expt.as_file(os.path.join(self.params.grid_search_jungfrau.outdir, 'prediction_%s_%.2f_%.2f_%.2f.expt'%(ts,dx,dy,dz)))
               ubx.as_file(os.path.join(self.params.grid_search_jungfrau.outdir, 'prediction_%s_%.2f_%.2f_%.2f.refl'%(ts,dx,dy,dz)))
-      from IPython import embed; embed(); exit()
+      print ('Final_result_max: ', max(self.trial_result), self.trial_result.index(max(self.trial_result)))
+      #from IPython import embed; embed(); exit()
 
   def evaluate_grid_search(self):
     pass
