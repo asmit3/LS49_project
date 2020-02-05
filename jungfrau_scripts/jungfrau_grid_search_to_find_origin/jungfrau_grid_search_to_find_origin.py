@@ -108,7 +108,7 @@ class GridSearch_Jungfrau(object):
 
       strong_refl = flex.reflection_table.from_file(strong_refl_f)
       if len(strong_refl) <self.params.grid_search_jungfrau.minimum_number_of_spots: continue 
-      imported_expt = ExperimentListFactory.from_json_file(imported_expt_f)
+      imported_expt = ExperimentListFactory.from_json_file(imported_expt_f, check_format=False)
       integrated_rayonix_expt = ExperimentListFactory.from_json_file(integrated_rayonix_expt_f, check_format=False)
 
       imported_expt[0].detector = self.jungfrau_geom[0].detector
