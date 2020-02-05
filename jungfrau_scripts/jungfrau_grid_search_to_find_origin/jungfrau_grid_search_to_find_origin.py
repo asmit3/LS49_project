@@ -5,6 +5,7 @@ from dials.array_family import flex
 from dxtbx.model.experiment_list import ExperimentListFactory, ExperimentList
 from dials.algorithms.spot_prediction import StillsReflectionPredictor
 from scitbx.matrix import col
+from libtbx.easy_pickle import dump
 
 phil_scope = parse(''' 
   grid_search_jungfrau {
@@ -82,7 +83,6 @@ class GridSearch_Jungfrau(object):
   def __init__(self):
     # Read phil stuff
     self.params = params_from_phil(sys.argv[1:])
-    self.trial_result = [] # a list to store trial result evaluation
 
   def setup_grid(self):
     dx_mm = self.params.grid_search_jungfrau.dx_mm 
@@ -103,6 +103,7 @@ class GridSearch_Jungfrau(object):
 
   def do_work(self, rank, iterable):
     for item in iterable:
+      self.trial_result = [] # a list to store trial result evaluation
       ts, strong_refl_f, imported_expt_f, integrated_rayonix_expt_f = item 
 
       strong_refl = flex.reflection_table.from_file(strong_refl_f)
@@ -122,7 +123,7 @@ class GridSearch_Jungfrau(object):
       s0 = col(d0.get_local_slow_axis())
       r0 = col(d0.get_local_origin())
       for dx in self.dx:
-        print ('Stage dx')
+        print ('Stage dx', ts)
         for dy in self.dy:
           for dz in self.dz:
             imported_expt[0].detector=original_detector
@@ -138,13 +139,14 @@ class GridSearch_Jungfrau(object):
             ubx=predictor.for_ub(imported_expt[0].crystal.get_A())
             ubx['id']=flex.int(len(ubx),0)
             #print ('NUMBER OF PREDS=', len(ubx), ts, dx,dy,dz)
-#            if len(ubx) == len(strong_refl):
-#              print ('NUMBER OF PREDS=', len(ubx), ts, dx,dy,dz)
+            if len(ubx) == len(strong_refl):
+              print ('NUMBER_OF_EXACT_PREDS=', len(ubx), ts, dx,dy,dz)
             self.evaluate_trial(strong_refl, ubx, imported_expt[0].detector)
             if self.params.grid_search_jungfrau.dump_intermediate_files:
               imported_expt.as_file(os.path.join(self.params.grid_search_jungfrau.outdir, 'prediction_%s_%.2f_%.2f_%.2f.expt'%(ts,dx,dy,dz)))
               ubx.as_file(os.path.join(self.params.grid_search_jungfrau.outdir, 'prediction_%s_%.2f_%.2f_%.2f.refl'%(ts,dx,dy,dz)))
-      print ('Final_result_max: ', max(self.trial_result), self.trial_result.index(max(self.trial_result)))
+      print ('Final_result_max: ', max(self.trial_result), self.trial_result.index(max(self.trial_result)), ts)
+      dump(os.path.join(self.params.grid_search_jungfrau.outdir, 'trial_result_%s.pickle'%ts), self.trial_result)
       #from IPython import embed; embed(); exit()
 
   def evaluate_grid_search(self):
@@ -164,6 +166,8 @@ class GridSearch_Jungfrau(object):
         dpx = (r_strong - r_predicted).length()/pixel_size
         if dpx < self.params.grid_search_jungfrau.critical_pixel_dist:
           count +=1
+    if count >2:
+      print ('Spots within critical pixel RMSD cutoff = ', count)
     self.trial_result.append(count)
     
 
@@ -197,13 +201,14 @@ class GridSearch_Jungfrau(object):
       size = comm.Get_size()  # size: number of processes running in this job
 
         # Configure the logging
-      if params.output.logging_dir is None:
+      params=self.params
+      if params.grid_search_jungfrau.outdir is None:
         logfile = None
       else:
         log_path = os.path.join(
-            params.output.logging_dir, "log_rank%04d.out" % rank)
+            params.grid_search_jungfrau.outdir, "log_rank%04d.out" % rank)
         error_path = os.path.join(
-            params.output.logging_dir, "error_rank%04d.out" % rank)
+            params.grid_search_jungfrau.outdir, "error_rank%04d.out" % rank)
         print("Redirecting stdout to %s" % log_path)
         print("Redirecting stderr to %s" % error_path)
         sys.stdout = open(log_path, "a", buffering=0)
