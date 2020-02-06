@@ -57,7 +57,10 @@ phil_scope = parse('''
               refl/expt files from each prediction of each perturbed detector distance
     critical_pixel_dist = 10
       .type = float
-      .help = critical pixel distance used to evaluate whether prediction is close enough to a strong spot \
+      .help = critical pixel distance used to evaluate whether prediction is close enough to a strong spot
+    critical_number_of_spots_within_cutoff = 2
+      .type = int
+      .help = Prints out the dx,dy,dz if atleast these many spots are within the critical_pixel_dist 
 }
 ''')
 
@@ -139,9 +142,9 @@ class GridSearch_Jungfrau(object):
             ubx=predictor.for_ub(imported_expt[0].crystal.get_A())
             ubx['id']=flex.int(len(ubx),0)
             #print ('NUMBER OF PREDS=', len(ubx), ts, dx,dy,dz)
-            if len(ubx) == len(strong_refl):
-              print ('NUMBER_OF_EXACT_PREDS=', len(ubx), ts, dx,dy,dz)
-            self.evaluate_trial(strong_refl, ubx, imported_expt[0].detector)
+            #if len(ubx) == len(strong_refl):
+            #  print ('NUMBER_OF_EXACT_PREDS=', len(ubx), ts, dx,dy,dz)
+            self.evaluate_trial(strong_refl, ubx, imported_expt[0].detector, [dx,dy,dz])
             if self.params.grid_search_jungfrau.dump_intermediate_files:
               imported_expt.as_file(os.path.join(self.params.grid_search_jungfrau.outdir, 'prediction_%s_%.2f_%.2f_%.2f.expt'%(ts,dx,dy,dz)))
               ubx.as_file(os.path.join(self.params.grid_search_jungfrau.outdir, 'prediction_%s_%.2f_%.2f_%.2f.refl'%(ts,dx,dy,dz)))
@@ -152,7 +155,7 @@ class GridSearch_Jungfrau(object):
   def evaluate_grid_search(self):
     pass
 
-  def evaluate_trial(self, strong_refl, predicted_refl, detector):
+  def evaluate_trial(self, strong_refl, predicted_refl, detector, displacement_array):
     pixel_size = detector[0].get_pixel_size()[0]
     count = 0
     for ii, strong in enumerate(strong_refl.rows()):
@@ -166,8 +169,8 @@ class GridSearch_Jungfrau(object):
         dpx = (r_strong - r_predicted).length()/pixel_size
         if dpx < self.params.grid_search_jungfrau.critical_pixel_dist:
           count +=1
-    if count >2:
-      print ('Spots within critical pixel RMSD cutoff = ', count)
+    if count >= self.params.grid_search_jungfrau.critical_number_of_spots_within_cutoff:
+      print ('Spots within critical pixel RMSD cutoff = %d %.3f %.3f %.3f'%(count, displacement_array[0], displacement_array[1], displacement_array[2]))
     self.trial_result.append(count)
     
 
