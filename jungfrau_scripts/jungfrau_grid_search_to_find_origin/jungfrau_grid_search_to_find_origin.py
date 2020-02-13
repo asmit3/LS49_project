@@ -116,6 +116,7 @@ class GridSearch_Jungfrau(object):
 
       imported_expt[0].detector = self.jungfrau_geom[0].detector
       imported_expt[0].crystal = integrated_rayonix_expt[0].crystal
+      imported_expt[0].beam = integrated_rayonix_expt[0].beam # Absolutely must use rayonix beam because ebeam is wrong here
       imported_expt[0].crystal.set_domain_size_ang(self.params.grid_search_jungfrau.mosaicity_Deff)
       imported_expt[0].crystal.set_half_mosaicity_deg(self.params.grid_search_jungfrau.mosaicity_eta_half)
 
