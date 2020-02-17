@@ -129,9 +129,11 @@ class Script(object):
     from simtbx.diffBragg import nanoBragg_crystal, nanoBragg_beam
     from copy import deepcopy
     from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
+    import time
 
     ts = item_list[0] 
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.0, resmax=13.5, ls49_data_dir=self.params.LS49_diffBragg.rayonix_expt_path)
+    t_start = time.time()
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5, ls49_data_dir=self.params.LS49_diffBragg.rayonix_expt_path)
  
 
     C = data["dxcrystal"]
@@ -310,7 +312,10 @@ class Script(object):
       ref_predictor(indexed_reflections)
       indexed_reflections.as_file(os.path.join(self.output_dir, 'after_refinement_%s.refl'%ts))
       # Also dump the RUC2 object for good measure
-      dump('RUC2_%s.pickle'%ts, RUC2)
+      #dump('RUC2_%s.pickle'%ts, RUC2)
+    t_end = time.time()
+    delta_time = t_end - t_start
+    print ('DiffBragg_LS49_timing %s  = %d'%(ts,delta_time))
 
 if __name__ == "__main__":
   try:

@@ -27,9 +27,9 @@ def strong_spot_mask(refl_tbl, img_size):
 def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
                             Nstrongest = 30,
                             resmax=12.0, resmin=3.0,
-                            mtz_file='5cmv_Iobs.mtz',
+                            #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
+                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             ls49_data_dir=None):
     import os, pickle, numpy as np
     from scipy.interpolate import interp1d
@@ -115,8 +115,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
 
     M = mtz.object(os.path.join(ls49_data_dir,'../',mtz_file))
-    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
-    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
+    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
+    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
@@ -165,8 +165,8 @@ if __name__ == "__main__":
                               '20180501143701853'] # Does not work
 
     ts = timestamps_of_interest[7]
-    #ts='20180501143546883'
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.0, resmax=13.5)
+    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5)
     C = data["dxcrystal"]
     D = data["dxdetector"]
     B = data["dxbeam"]
@@ -297,7 +297,6 @@ if __name__ == "__main__":
     RUC.refine_Bmatrix = False
     RUC.verbose=True
     RUC.plot_stride=1
-    RUC.refine_background_planes = False
     RUC.refine_ncells=False #
     RUC.refine_crystal_scale = False # scale factor
     RUC.refine_gain_fac = False
@@ -316,8 +315,9 @@ if __name__ == "__main__":
     RUC.refine_ncells=True
     RUC.refine_crystal_scale=True
     RUC.run()
-    refined_ncells = RUC.x[7]
-    refined_scale = RUC.x[10]
+    refined_ncells = RUC.x[-4]
+    refined_scale = RUC.x[-1]
+    refined_gain = RUC.x[-2]
 
     if False:
       for i_spot in range(RUC.n_spots):
@@ -369,17 +369,16 @@ if __name__ == "__main__":
         SimData_instance=SIM2,
         plot_images=args.plot,
         ucell_manager=UcellMan,
-        init_gain=1,
+        init_gain=refined_gain,
         init_scale=refined_scale)
     RUC2.trad_conv = True
     RUC2.trad_conv_eps = 1e-5
     RUC2.max_calls = 250
-    RUC2.refine_background_planes = False
+    RUC2.refine_background_planes = True
     RUC2.refine_Umatrix = True
     RUC2.refine_Bmatrix = True
     RUC2.verbose=True
     RUC2.plot_stride=1
-    RUC2.refine_background_planes = False
     RUC2.refine_ncells=True #
     RUC2.refine_crystal_scale = True # scale factor
     RUC2.refine_gain_fac = False
