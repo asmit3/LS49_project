@@ -132,6 +132,7 @@ if __name__ == "__main__":
     from simtbx.diffBragg import nanoBragg_crystal, nanoBragg_beam
     from copy import deepcopy
     from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
+    from dials.array_family import flex
 
     parser = ArgumentParser()
     parser.add_argument("--plot", action='store_true')
@@ -270,15 +271,16 @@ if __name__ == "__main__":
         vmax=m+2.5*s
 
         plt.imshow(I, vmin=vmin, vmax=vmax)
-        for x1, x2, y1, y2 in data["bboxes_x1x2y1y2"]:
-            patch = plt.Rectangle(
-                width=x2-x1,
-                height=y2-y1,
-                xy=(x1, y1),
-                ec='r', fc='none')
-            plt.gca().add_patch(patch)
-        plt.show()
-
+        #for x1, x2, y1, y2 in data["bboxes_x1x2y1y2"]:
+        #    patch = plt.Rectangle(
+        #        width=x2-x1,
+        #        height=y2-y1,
+        #        xy=(x1, y1),
+        #        ec='r', fc='none')
+        #    plt.gca().add_patch(patch)
+        #plt.show()
+    n_spots = len(data['tilt_abc'])
+    init_local_spotscale = flex.double([1.0]*n_spots)
     RUC = RefineAll(
         spot_rois=data["bboxes_x1x2y1y2"],
         spot_resolution=data['resolution'],
@@ -288,7 +290,8 @@ if __name__ == "__main__":
         plot_images=args.plot,
         ucell_manager=UcellMan,
         init_gain=1,
-        init_scale=1.0)
+        init_scale=1.0,
+        init_local_spotscale = init_local_spotscale)
     RUC.trad_conv = True
     RUC.trad_conv_eps = 1e-5
     RUC.max_calls = 250
@@ -301,6 +304,7 @@ if __name__ == "__main__":
     RUC.refine_crystal_scale = False # scale factor
     RUC.refine_gain_fac = False
     RUC.refine_detdist=False
+    RUC.refine_local_spotscale=True
     RUC.use_curvatures_threshold=7 # Keep calculating them and after 7 times switch over to using them
     RUC.use_curvatures=False #
     RUC.calc_curvatures=True # if set to False, never uses curvatures
@@ -313,11 +317,12 @@ if __name__ == "__main__":
 
     # First refine scale factors and ncells, then refine everything else
     RUC.refine_ncells=True
-    RUC.refine_crystal_scale=True
+    RUC.refine_crystal_scale=False
     RUC.run()
     refined_ncells = RUC.x[-4]
     refined_scale = RUC.x[-1]
     refined_gain = RUC.x[-2]
+    refined_local_spotscale = RUC.x[RUC.n_bg:RUC.n_bg+RUC.n_spots]
 
     if False:
       for i_spot in range(RUC.n_spots):
@@ -370,7 +375,8 @@ if __name__ == "__main__":
         plot_images=args.plot,
         ucell_manager=UcellMan,
         init_gain=refined_gain,
-        init_scale=refined_scale)
+        init_scale=refined_scale,
+        init_local_spotscale=refined_local_spotscale)
     RUC2.trad_conv = True
     RUC2.trad_conv_eps = 1e-5
     RUC2.max_calls = 250
@@ -383,11 +389,11 @@ if __name__ == "__main__":
     RUC2.refine_crystal_scale = True # scale factor
     RUC2.refine_gain_fac = False
     RUC2.refine_detdist=False
+    RUC2.refine_local_spotscale=True
     RUC2.use_curvatures_threshold=7 # Keep calculating them and after 7 times switch over to using them
-    RUC2.use_curvatures=False #
+    RUC2.use_curvatures=False # using curvatures asmit
     RUC2.calc_curvatures=True # if set to False, never uses curvatures
     RUC2.run()
-    #from IPython import embed; embed(); exit()
 
     print("Done.")
     print("Refined scale =%f", RUC.x[-1])
