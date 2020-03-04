@@ -167,7 +167,11 @@ if __name__ == "__main__":
 
     ts = timestamps_of_interest[7]
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5)
+    #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    #ts='20180501114703722'
+    #ts='20180501120317142'
+    ls49_data_dir=None
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5, ls49_data_dir=ls49_data_dir)
     C = data["dxcrystal"]
     D = data["dxdetector"]
     B = data["dxbeam"]

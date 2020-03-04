@@ -36,9 +36,9 @@ def strong_spot_mask(refls, panel_size, n_panels):
 def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
                             Nstrongest = 30,
                             resmax=12.0, resmin=3.0,
-                            #mtz_file='5cmv_Iobs.mtz',
+                            mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
+                            #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             ls49_data_dir=None):
     import os, pickle, numpy as np
     from scipy.interpolate import interp1d
@@ -154,8 +154,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
 
     M = mtz.object(os.path.join(ls49_data_dir,'../',mtz_file))
-    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
-    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
+    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
+    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/out_jungfrau_shoeboxes2'
     ts='20180501114703722'
     #ts='20180501120317142'
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5, ls49_data_dir=ls49_data_dir)
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.0, resmax=13.5, ls49_data_dir=ls49_data_dir)
     C = data["dxcrystal"]
     D = data["dxdetector"]
     B = data["dxbeam"]
@@ -296,6 +296,11 @@ if __name__ == "__main__":
                               oversample=0,
                               interpolate=0,
                               verbose=0)
+    #SIM.D.Ncells_abc =  10
+    
+    SIM.D.detector_attenuation_length_mm = 0
+    SIM.D.detector_thicksteps = 0
+    SIM.D.point_pixel = True  # NOTE detector distance negative bug
     SIM.D.show_params()
     #SIM.D.spot_scale = 1e6 # to guide your eye
     #SIM.panel_id = 0
@@ -362,9 +367,10 @@ if __name__ == "__main__":
 
     # First refine scale factors and ncells, then refine everything else
     RUC.refine_ncells=True
-    RUC.refine_crystal_scale=False
+    RUC.refine_crystal_scale=True
+    #import pdb; pdb.set_trace()
     RUC.run()
-    refined_ncells = RUC.x[-4]
+    refined_ncells = RUC.x[RUC.ncells_xpos]
     refined_scale = RUC.x[-1]
     refined_gain = RUC.x[-2]
     refined_local_spotscale = RUC.x[RUC.n_bg:RUC.n_bg+RUC.n_spots]
@@ -410,6 +416,12 @@ if __name__ == "__main__":
                               oversample=0,
                               interpolate=0,
                               verbose=0)
+
+    
+    SIM2.D.detector_attenuation_length_mm = 0
+    SIM2.D.detector_thicksteps = 0
+    SIM2.D.point_pixel = True  # NOTE detector distance negative bug
+
     SIM2.D.show_params()
     RUC2 = RefineAll_JF1M_MultiPanel(
         spot_rois=data["bboxes_x1x2y1y2"],
@@ -426,7 +438,7 @@ if __name__ == "__main__":
     RUC2.trad_conv = True
     RUC2.trad_conv_eps = 1e-5
     RUC2.max_calls = 250
-    RUC2.refine_background_planes = True
+    RUC2.refine_background_planes = False
     RUC2.refine_Umatrix = True
     RUC2.refine_Bmatrix = True
     RUC2.verbose=True
