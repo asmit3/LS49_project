@@ -187,10 +187,10 @@ class PSF_deconvolve(object):
       lucy = 1.0*raw_image
       for i in xrange( niter ):
           print 'iteration # = ',i
-          estimate = convolve(lucy, psf) + 1e-300 # Denominator (u(t)*p)
+          estimate = convolve(lucy, psf) + 1.e-15 # Denominator (u(t)*p)
           #estimate[ np.isnan(estimate) ] = 0
           relative_blur = raw_image/estimate # (d/(u(t)*p)
-          correction = convolve(relative_blur, psf_hat) #+ 1e-300 #([d/(u(t)*p)]*p_hat)
+          correction = convolve(relative_blur, psf_hat)+ 1.e-15 #([d/(u(t)*p)]*p_hat)
           #correction[ np.isnan(correction) ] = 0
           lucy *= correction   # u(t+1) = u(t)*[{d/(u(t)*p)}*p_hat]
       return lucy
@@ -308,8 +308,8 @@ if __name__=='__main__':
   fwhm_pixel = fwhm/lpix # Convert fwhm to pixels
   xpsf = 25 # PSF box shape x-dim
   ypsf = 25 # PSF box shape y-dim
-  niter=50 # Number of iterations for Lucy Richardson algorithm
-  fft_flag = False # Whether to use FFT deconvolver or Lucy Richardson
+  niter=20 # Number of iterations for Lucy Richardson algorithm
+  fft_flag = True # Whether to use FFT deconvolver or Lucy Richardson
   
   # Load up image and raw data here
   ts='20180501143545184' # Good example image with some PSF effects clearly visible
@@ -337,7 +337,7 @@ if __name__=='__main__':
       sizeY=960
       #psf = makeGaussPSF(fwhm_pixel,sizeX, sizeY)
       psf = deconvolver.makeGauss_integPSF(fwhm_pixel,sizeX, sizeY)
-      #psf = makeMoffat_integPSF(fwhm_pixel, sizeX, sizeY)
+      #psf = deconvolver.makeMoffat_integPSF(fwhm_pixel, sizeX, sizeY)
   #    exportArrayAsImage(psf, 'PSF.img')
       InputDeconv = np.abs(deconvolver.deconvolve_fft(Input.as_numpy_array(), psf.as_numpy_array(), epsilon))
   #    exportArrayAsImage(fftshift(InputNoisyConv), 'NoisyConvolved.img')
@@ -354,7 +354,14 @@ if __name__=='__main__':
       InputDeconv = InputDeconv.as_numpy_array()
       header=None
       deconvolver.exportArrayAsImage(InputDeconv,'deconvolved_psf_00000.img',header)
-      #from IPython import embed; embed(); exit()
+      # Convolve with gaussian psf to avoid halos ?
+      print ('Now adding Gauss PSF to reduce halo around strong spots')
+      fwhm_halo_pixel=27.0/177.8
+      psf_halo = deconvolver.makeMoffat_integPSF(fwhm_halo_pixel, 9, 9)
+      InputDeconv_addGaussPSF_for_halo = convolve(flex.double(InputDeconv), psf_halo)
+      deconvolver.exportArrayAsImage(InputDeconv_addGaussPSF_for_halo.as_numpy_array(),'my_00000.img',header)
+
+
       #writer.add_data_to_cbf(cbf_handle, data=flex.double(InputDeconv))
       #cbf_handle.write_widefile(
       #      'deconv.cbf', pycbf.CBF, pycbf.MIME_HEADERS | pycbf.MSG_DIGEST | pycbf.PAD_4K, 0 )
