@@ -165,7 +165,7 @@ if __name__ == "__main__":
                               '20180501143652325', # curvature assertion error, looked good till then
                               '20180501143701853'] # Does not work
 
-    ts = timestamps_of_interest[7]
+    ts = timestamps_of_interest[-2]
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
     #ts='20180501114703722'
@@ -312,7 +312,8 @@ if __name__ == "__main__":
     RUC.use_curvatures_threshold=7 # Keep calculating them and after 7 times switch over to using them
     RUC.use_curvatures=False #
     RUC.calc_curvatures=True # if set to False, never uses curvatures
-    RUC.refine_with_restraints=True
+    RUC.refine_with_restraints=False
+    RUC.refine_with_psf=True
     #RUC.run()
     #if RUC.hit_break_to_use_curvatures:
     #  RUC.num_positive_curvatures=0
@@ -321,7 +322,7 @@ if __name__ == "__main__":
 
     # First refine scale factors and ncells, then refine everything else
     RUC.refine_ncells=True
-    RUC.refine_crystal_scale=False
+    RUC.refine_crystal_scale=True
     RUC.run()
     refined_ncells = RUC.x[-4]
     refined_scale = RUC.x[-1]
@@ -397,6 +398,7 @@ if __name__ == "__main__":
     RUC2.use_curvatures_threshold=7 # Keep calculating them and after 7 times switch over to using them
     RUC2.use_curvatures=False # using curvatures asmit
     RUC2.calc_curvatures=True # if set to False, never uses curvatures
+    RUC2.refine_with_psf=True 
     RUC2.run()
 
     print("Done.")
