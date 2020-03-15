@@ -101,8 +101,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max_energy - 35
-    max_energy_interpol = max_energy + 35
+    min_energy_interpol = max_energy - 15
+    max_energy_interpol = max_energy + 15
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
@@ -133,6 +133,7 @@ if __name__ == "__main__":
     from copy import deepcopy
     from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
     from dials.array_family import flex
+    import pylab as plt
 
     parser = ArgumentParser()
     parser.add_argument("--plot", action='store_true')
@@ -172,6 +173,9 @@ if __name__ == "__main__":
     #ts='20180501120317142'
     ls49_data_dir=None
     data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5, ls49_data_dir=ls49_data_dir)
+
+    refine_with_psf=True
+
     C = data["dxcrystal"]
     D = data["dxdetector"]
     B = data["dxbeam"]
@@ -190,334 +194,238 @@ if __name__ == "__main__":
     # Some global variables here for LS49
     mos_spread_deg=0.001
     n_mos_domains=1
-    
-
     a,b,c,_,_,_ = C.get_unit_cell().parameters()
     Deff = 1000
-    Ncells_abc = np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
-    nbcryst = nanoBragg_crystal.nanoBragg_crystal()
-    nbcryst.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
-    nbcryst.mos_spread_deg = mos_spread_deg
-    nbcryst.n_mos_domains = n_mos_domains
-    nbcryst.thick_mm = 0.005
-    nbcryst.miller_array = data["sfall"]
-    nbcryst.dxtbx_crystal = C
+    Ncells_abc_0 = np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
+    n_spots = len(data['tilt_abc'])
+    init_local_spotscale = flex.double([1.0]*n_spots)
 
-    nbbeam = nanoBragg_beam.nanoBragg_beam()
-    nbbeam.unit_s0 = B.get_unit_s0()
-    nbbeam.spectrum = data["spectrum"]
 
-    if False:
-      D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/fake_jungfrau_from_rayonix.expt', check_format=False)[0].detector
-      #D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
+    # Define number of macrocycles and strategies
+    n_macrocycles=5
 
-      nbcryst_final = nanoBragg_crystal.nanoBragg_crystal()
-      nbcryst_final.Ncells_abc = 5,5,5 #Ncells_abc, Ncells_abc, Ncells_abc
-      nbcryst_final.mos_spread_deg = mos_spread_deg
-      nbcryst_final.n_mos_domains = n_mos_domains
-      nbcryst_final.thick_mm = 0.005
-      nbcryst_final.miller_array = data["sfall"]
-      nbcryst_final.dxtbx_crystal = C
+    ncells_strategy =          [True, False, True, False, False]
+    local_spotscale_strategy = [True, False, True, False, False]
+    crystal_scale_strategy =   [False,True, False, False, False]
 
-      SIM_jung = SimData()
-      SIM_jung.crystal = nbcryst
-      SIM_jung.detector = D #D_jung
-      SIM_jung.beam = nbbeam
+    background_strategy =      [False, True, False, False, False]
+    umat_strategy =            [False, True, False, True, True] 
+    bmat_strategy =            [False, True, False, True, False] 
 
-      SIM_jung.instantiate_diffBragg(adc_offset=0,
+    for n_cycle in range(n_macrocycles):
+      if n_cycle==0:
+        refined_ncells = Ncells_abc_0
+        refined_scale = 1.0
+        refined_gain = 1.0
+        refined_local_spotscale = init_local_spotscale 
+        refined_tilt_abc=data['tilt_abc']
+
+      Ncells_abc=refined_ncells # Setting it here for cycles not equal to 0
+      # Set up nbcryst and nbbeam
+      nbcryst = nanoBragg_crystal.nanoBragg_crystal()
+      nbcryst.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
+      nbcryst.mos_spread_deg = mos_spread_deg
+      nbcryst.n_mos_domains = n_mos_domains
+      nbcryst.thick_mm = 0.005
+      nbcryst.miller_array = data["sfall"]
+      nbcryst.dxtbx_crystal = C
+      nbbeam = nanoBragg_beam.nanoBragg_beam()
+      nbbeam.unit_s0 = B.get_unit_s0()
+      nbbeam.spectrum = data["spectrum"]
+      # Set up simdata
+      SIM = SimData()
+      SIM.crystal = nbcryst
+      SIM.detector = D
+      SIM.beam = nbbeam
+
+      SIM.instantiate_diffBragg(adc_offset=0,
                                 oversample=0,
                                 interpolate=0,
                                 verbose=0)
-      SIM_jung.D.show_params()
-      SIM_jung.D.spot_scale = 1e6 # to guide your eye
-      SIM_jung.panel_id = 0
-      SIM_jung.D.add_diffBragg_spots()
-      img=SIM_jung.D.raw_pixels.as_numpy_array()
-      import matplotlib.pyplot as plt
-      m = img[img>1.e-9].mean()
-      s = img[img>1.e-9].std()
-      vmin = 1
-      vmax = 1000 #m+5*s
-      plt.imshow(img, vmax=vmax, vmin=vmin)
-      plt.show()
-      plt.imshow(img, vmax=vmax, vmin=vmin)
-      plt.show()
-      exit()
+      SIM.D.show_params()
 
+      ucell = C.get_unit_cell().parameters()
+      UcellMan = MonoclinicManager(a=ucell[0], b=ucell[1], c=ucell[2], beta=ucell[4]*np.pi / 180.)
 
-    SIM = SimData()
-    # maybe make Ncells very small e.g. 5x5x5
-    #nbcryst.Ncells_abc (5,5,5)
-    SIM.crystal = nbcryst
-    SIM.detector = D
-    SIM.beam = nbbeam
+      RUC = RefineAll(
+          spot_rois=data["bboxes_x1x2y1y2"],
+          spot_resolution=data['resolution'],
+          abc_init=refined_tilt_abc,
+          img=data["data_img"],
+          SimData_instance=SIM,
+          plot_images=args.plot,
+          ucell_manager=UcellMan,
+          init_gain=refined_gain,
+          init_scale=refined_scale,
+          init_local_spotscale=refined_local_spotscale)
 
-    SIM.instantiate_diffBragg(adc_offset=0,
-                              oversample=0,
-                              interpolate=0,
-                              verbose=0)
-    SIM.D.show_params()
-    #SIM.D.spot_scale = 1e6 # to guide your eye
-    #SIM.panel_id = 0
-    #SIM.D.add_diffBragg_spots()
-    #img=SIM.D.raw_pixels.as_numopy_array()
+      RUC.trad_conv_eps = 1e-5
+      RUC.use_curvatures=False #
+      RUC.calc_curvatures=True # if set to False, never uses curvatures
+      RUC.refine_with_psf=refine_with_psf
 
-    ucell = C.get_unit_cell().parameters()
-    UcellMan = MonoclinicManager(a=ucell[0], b=ucell[1], c=ucell[2], beta=ucell[4]*np.pi / 180.)
-    import pylab as plt
-    if args.plot:
-        I = data["data_img"].copy()
-        M = ~data["mask"]
-        I*=M
-        m = I[I > 0].mean()
-        s = I[I > 0].std()
-        vmin = m-s
-        vmax=m+2.5*s
+      RUC.refine_ncells=ncells_strategy[n_cycle]
+      RUC.refine_crystal_scale=crystal_scale_strategy[n_cycle]
+      RUC.refine_local_spotscale=local_spotscale_strategy[n_cycle]
+      RUC.refine_background_planes = background_strategy[n_cycle]
+      RUC.refine_Umatrix = umat_strategy[n_cycle]
+      RUC.refine_Bmatrix = bmat_strategy[n_cycle]
 
-        plt.imshow(I, vmin=vmin, vmax=vmax)
-        #for x1, x2, y1, y2 in data["bboxes_x1x2y1y2"]:
-        #    patch = plt.Rectangle(
-        #        width=x2-x1,
-        #        height=y2-y1,
-        #        xy=(x1, y1),
-        #        ec='r', fc='none')
-        #    plt.gca().add_patch(patch)
-        #plt.show()
-    n_spots = len(data['tilt_abc'])
-    init_local_spotscale = flex.double([1.0]*n_spots)
-    RUC = RefineAll(
-        spot_rois=data["bboxes_x1x2y1y2"],
-        spot_resolution=data['resolution'],
-        abc_init=data["tilt_abc"],
-        img=data["data_img"],
-        SimData_instance=SIM,
-        plot_images=args.plot,
-        ucell_manager=UcellMan,
-        init_gain=1,
-        init_scale=1.0,
-        init_local_spotscale = init_local_spotscale)
-    RUC.trad_conv = True
-    RUC.trad_conv_eps = 1e-5
-    RUC.max_calls = 250
-    RUC.refine_background_planes = False
-    RUC.refine_Umatrix = False
-    RUC.refine_Bmatrix = False
-    RUC.verbose=True
-    RUC.plot_stride=1
-    RUC.refine_ncells=False #
-    RUC.refine_crystal_scale = False # scale factor
-    RUC.refine_gain_fac = False
-    RUC.refine_detdist=False
-    RUC.refine_local_spotscale=True
-    RUC.use_curvatures_threshold=7 # Keep calculating them and after 7 times switch over to using them
-    RUC.use_curvatures=False #
-    RUC.calc_curvatures=True # if set to False, never uses curvatures
-    RUC.refine_with_restraints=False
-    RUC.refine_with_psf=True
-    #RUC.run()
-    #if RUC.hit_break_to_use_curvatures:
-    #  RUC.num_positive_curvatures=0
-    #  RUC.use_curvatures=True
-    #  RUC.run(setup=False) # Now it will use curvatures
+      RUC.run()
 
-    # First refine scale factors and ncells, then refine everything else
-    RUC.refine_ncells=True
-    RUC.refine_crystal_scale=True
-    RUC.run()
-    refined_ncells = RUC.x[-4]
-    refined_scale = RUC.x[-1]
-    refined_gain = RUC.x[-2]
-    refined_local_spotscale = RUC.x[RUC.n_bg:RUC.n_bg+RUC.n_spots]
+      show_pixel_values=False
 
-    if False:
-      for i_spot in range(RUC.n_spots):
-        fig, axs = plt.subplots(1,2)
-        axs[0].imshow([[0, 1, 1], [0, 1, 2]])
-        axs[1].imshow([[0, 1, 1], [0, 1, 2]])
-        x = RUC.store_model_Lambda[i_spot]
-        y = RUC.store_Imeas[i_spot]
-        vmin = RUC.store_vmin[i_spot]
-        vmax = RUC.store_vmax[i_spot]
-        axs[0].images[0].set_data(x)
-        axs[1].images[0].set_data(y)
-        axs[0].images[0].set_clim(vmin, vmax)
-        axs[1].images[0].set_clim(vmin, vmax)
-        plt.suptitle("Spot number = %d"%i_spot)
-      plt.show()
+      refined_ncells = RUC.x[-4]
+      refined_scale = RUC.x[-1]
+      refined_gain = RUC.x[-2]
+      refined_local_spotscale = RUC.x[RUC.n_bg:RUC.n_bg+RUC.n_spots]
+      refined_tilt_abc=[]
+      for i in range(RUC.n_spots):
+        refined_tilt_abc.append([RUC.x[i], RUC.x[RUC.n_spots+i], RUC.x[2*RUC.n_spots+i]])
+      refined_tilt_abc=np.array(refined_tilt_abc)
 
-    #from IPython import embed; embed(); exit() 
-    # Now set the other stuff to refine
-    print (' ================== now refining all the variables ======================= ')
-    Ncells_abc = refined_ncells #np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
-    nbcryst = nanoBragg_crystal.nanoBragg_crystal()
-    nbcryst.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
-    nbcryst.mos_spread_deg = mos_spread_deg
-    nbcryst.n_mos_domains = n_mos_domains
-    nbcryst.thick_mm = 0.005
-    nbcryst.miller_array = data["sfall"]
-    nbcryst.dxtbx_crystal = C
-
-    nbbeam = nanoBragg_beam.nanoBragg_beam()
-    nbbeam.unit_s0 = B.get_unit_s0()
-    nbbeam.spectrum = data["spectrum"]
-
-    SIM2 = SimData()
-    SIM2.crystal = nbcryst
-    SIM2.detector = D
-    SIM2.beam = nbbeam
-
-    SIM2.instantiate_diffBragg(adc_offset=0,
-                              oversample=0,
-                              interpolate=0,
-                              verbose=0)
-    SIM2.D.show_params()
-    RUC2 = RefineAll(
-        spot_rois=data["bboxes_x1x2y1y2"],
-        spot_resolution=data['resolution'],
-        abc_init=data["tilt_abc"],
-        img=data["data_img"],
-        SimData_instance=SIM2,
-        plot_images=args.plot,
-        ucell_manager=UcellMan,
-        init_gain=refined_gain,
-        init_scale=refined_scale,
-        init_local_spotscale=refined_local_spotscale)
-    RUC2.trad_conv = True
-    RUC2.trad_conv_eps = 1e-5
-    RUC2.max_calls = 250
-    RUC2.refine_background_planes = True
-    RUC2.refine_Umatrix = True
-    RUC2.refine_Bmatrix = True
-    RUC2.verbose=True
-    RUC2.plot_stride=1
-    RUC2.refine_ncells=True #
-    RUC2.refine_crystal_scale = True # scale factor
-    RUC2.refine_gain_fac = False
-    RUC2.refine_detdist=False
-    RUC2.refine_local_spotscale=True
-    RUC2.use_curvatures_threshold=7 # Keep calculating them and after 7 times switch over to using them
-    RUC2.use_curvatures=False # using curvatures asmit
-    RUC2.calc_curvatures=True # if set to False, never uses curvatures
-    RUC2.refine_with_psf=True 
-    RUC2.run()
-
-    print("Done.")
-    print("Refined scale =%f", RUC.x[-1])
-    show_pixel_values=False
-    if True:
-      for i_spot in range(RUC2.n_spots):
-        fig, axs = plt.subplots(4,2)
-        axs[0][0].imshow([[0, 1, 1], [0, 1, 2]])
-        axs[1][0].imshow([[0, 1, 1], [0, 1, 2]])
-        axs[0][1].imshow([[0, 1, 1], [0, 1, 2]])
-        axs[1][1].imshow([[0, 1, 1], [0, 1, 2]])
-        axs[2][0].imshow([[0, 1, 1], [0, 1, 2]])
-        axs[2][1].imshow([[0, 1, 1], [0, 1, 2]])
-        axs[3][0].imshow([[0, 1, 1], [0, 1, 2]]) # before
-        axs[3][1].imshow([[0, 1, 1], [0, 1, 2]]) # after
-
-        x = RUC2.store_model_Lambda[i_spot]
-        y = RUC2.store_Imeas[i_spot]
-        x1 = RUC.store_model_Lambda[i_spot]
-        y1 = RUC.store_Imeas[i_spot]
-        x0 = RUC.store_init_model_Lambda[i_spot]
-        y0 = RUC.store_init_Imeas[i_spot]
-        deltaI0 = np.abs(x0-y0)
-        deltaI = np.abs(x-y)
+      # Refinement analysis: use a linear correlation and linear regression model ?
+      if True:
+        all_x = flex.double()
+        all_y = flex.double()
+        for i_spot in range(RUC.n_spots):
+          x = RUC.store_model_Lambda[i_spot]
+          y = RUC.store_Imeas[i_spot]
+          all_x.extend(flex.double(x.flatten()))
+          all_y.extend(flex.double(y.flatten()))
+        z_regression=flex.linear_regression(all_x, all_y)
+        z_correlation=flex.linear_correlation(all_x, all_y)
+        print ('--------- Linear Regression Summary----------')
+        z_regression.show_summary()
+        print ('----------------------------------------------')
+        print ('--------- Linear Correlation Summary----------')
+        z_correlation.show_summary()
+        # Skewness should match up ?
+        z_calc=all_x-flex.mean(all_x)
+        z_obs=all_y-flex.mean(all_y)
+        skew_calc=flex.mean(flex.pow(z_calc,3))/flex.mean(flex.pow(z_calc,2))**(3/2.)
+        skew_obs=flex.mean(flex.pow(z_obs,3))/flex.mean(flex.pow(z_obs,2))**(3/2.)
+        print ('Skewness of Raw data = ', skew_obs) 
+        print ('Skewness of Modelled data = ', skew_calc) 
       
-        vmin = RUC2.store_vmin[i_spot]
-        vmax = RUC2.store_vmax[i_spot]
-        vmin1 = RUC.store_vmin[i_spot]
-        vmax1 = RUC.store_vmax[i_spot]
-        vmin0 = RUC.store_init_vmin[i_spot]
-        vmax0 = RUC.store_init_vmax[i_spot]
-        axs[0][0].images[0].set_data(x0)
-        axs[1][0].images[0].set_data(x1)
-        axs[2][0].images[0].set_data(x)
-        axs[3][0].images[0].set_data(deltaI0)
+      if True and n_cycle==n_macrocycles-1:
+        for i_spot in range(RUC.n_spots):
+          fig, axs = plt.subplots(4,2)
+          axs[0][0].imshow([[0, 1, 1], [0, 1, 2]])
+          axs[1][0].imshow([[0, 1, 1], [0, 1, 2]])
+          axs[0][1].imshow([[0, 1, 1], [0, 1, 2]])
+          axs[1][1].imshow([[0, 1, 1], [0, 1, 2]])
+          axs[2][0].imshow([[0, 1, 1], [0, 1, 2]])
+          axs[2][1].imshow([[0, 1, 1], [0, 1, 2]])
+          axs[3][0].imshow([[0, 1, 1], [0, 1, 2]]) # before
+          axs[3][1].imshow([[0, 1, 1], [0, 1, 2]]) # after
 
-        axs[0][1].images[0].set_data(y0)
-        axs[1][1].images[0].set_data(y1)
-        axs[2][1].images[0].set_data(y)
-        axs[3][1].images[0].set_data(deltaI)
+          x = RUC.store_model_Lambda[i_spot]
+          y = RUC.store_Imeas[i_spot]
+          x1 = RUC.store_model_Lambda[i_spot]
+          y1 = RUC.store_Imeas[i_spot]
+          x0 = RUC.store_init_model_Lambda[i_spot]
+          y0 = RUC.store_init_Imeas[i_spot]
+          deltaI0 = np.abs(x0-y0)
+          deltaI = np.abs(x-y)
+        
+          vmin = RUC.store_vmin[i_spot]
+          vmax = RUC.store_vmax[i_spot]
+          vmin1 = RUC.store_vmin[i_spot]
+          vmax1 = RUC.store_vmax[i_spot]
+          vmin0 = RUC.store_init_vmin[i_spot]
+          vmax0 = RUC.store_init_vmax[i_spot]
+          axs[0][0].images[0].set_data(x0)
+          axs[1][0].images[0].set_data(x1)
+          axs[2][0].images[0].set_data(x)
+          axs[3][0].images[0].set_data(deltaI0)
 
-        axs[0][0].images[0].set_clim(vmin0, vmax0)
-        axs[1][0].images[0].set_clim(vmin1, vmax1)
-        axs[2][0].images[0].set_clim(vmin, vmax)
-        # Stuff just for deltaI
-        m = deltaI0[deltaI0 > 1e-9].mean()
-        s = deltaI0[deltaI0 > 1e-9].std()
-        dvmax = m+5*s
-        dvmin = m-s
-        axs[3][0].images[0].set_clim(dvmin, dvmax)
-        m = deltaI[deltaI > 1e-9].mean()
-        s = deltaI[deltaI > 1e-9].std()
-        dvmax = m+5*s
-        dvmin = m-s
-        axs[3][1].images[0].set_clim(dvmin, dvmax)
+          axs[0][1].images[0].set_data(y0)
+          axs[1][1].images[0].set_data(y1)
+          axs[2][1].images[0].set_data(y)
+          axs[3][1].images[0].set_data(deltaI)
 
-        axs[0][1].images[0].set_clim(vmin0, vmax0)
-        axs[1][1].images[0].set_clim(vmin1, vmax1)
-        axs[2][1].images[0].set_clim(vmin, vmax)
+          axs[0][0].images[0].set_clim(vmin0, vmax0)
+          axs[1][0].images[0].set_clim(vmin1, vmax1)
+          axs[2][0].images[0].set_clim(vmin, vmax)
+          # Stuff just for deltaI
+          m = deltaI0[deltaI0 > 1e-9].mean()
+          s = deltaI0[deltaI0 > 1e-9].std()
+          dvmax = m+5*s
+          dvmin = m-s
+          axs[3][0].images[0].set_clim(dvmin, dvmax)
+          m = deltaI[deltaI > 1e-9].mean()
+          s = deltaI[deltaI > 1e-9].std()
+          dvmax = m+5*s
+          dvmin = m-s
+          axs[3][1].images[0].set_clim(dvmin, dvmax)
 
-        axs[0][0].set_title('Before Refinement: Calc')
-        axs[1][0].set_title('Stage 1 Refinement: Calc')
-        axs[2][0].set_title('Final Refinement: Calc')
-        axs[3][0].set_title('Initial difference image')
+          axs[0][1].images[0].set_clim(vmin0, vmax0)
+          axs[1][1].images[0].set_clim(vmin1, vmax1)
+          axs[2][1].images[0].set_clim(vmin, vmax)
 
-        axs[0][1].set_title('Observation')
-        axs[1][1].set_title('Observation')
-        axs[2][1].set_title('Observation')
-        axs[3][1].set_title('Final difference image')
+          axs[0][0].set_title('Before Refinement: Calc')
+          axs[1][0].set_title('Stage 1 Refinement: Calc')
+          axs[2][0].set_title('Final Refinement: Calc')
+          axs[3][0].set_title('Initial difference image')
 
-        plt.suptitle("Spot number = %d at %.2f resolution"%(i_spot,RUC2.spot_resolution[i_spot]))
-        if show_pixel_values:
-          ds=3
-          df=3
-          smax=np.argmax(x0)//x0.shape[0]
-          fmax=np.argmax(x0)%x0.shape[0]
-          if smax-ds < 0 or smax +ds >= x0.shape[0]:
-            ds=0
-          if fmax-df <0 or fmax+df >= x0.shape[1]:
-            df=0
-          for s in range(smax-ds, smax+ds):
-            for f in range(fmax-df, fmax+df):
-              text=axs[0][0].text(f,s, int(x0[s,f]), ha="center", va="center", color="w")
-      plt.show()
+          axs[0][1].set_title('Observation')
+          axs[1][1].set_title('Observation')
+          axs[2][1].set_title('Observation')
+          axs[3][1].set_title('Final difference image')
 
-    best=RUC2.best_image
-    C2 = deepcopy(C)
-    ang, ax = RUC2.get_correction_misset(as_axis_angle_deg=True)
-    C2.rotate_around_origin(ax, ang)
-    C2.set_B(RUC2.get_refined_Bmatrix())
+          plt.suptitle("Spot number = %d at %.2f resolution"%(i_spot,RUC.spot_resolution[i_spot]))
+          if show_pixel_values:
+            ds=3
+            df=3
+            smax=np.argmax(x0)//x0.shape[0]
+            fmax=np.argmax(x0)%x0.shape[0]
+            if smax-ds < 0 or smax +ds >= x0.shape[0]:
+              ds=0
+            if fmax-df <0 or fmax+df >= x0.shape[1]:
+              df=0
+            for s in range(smax-ds, smax+ds):
+              for f in range(fmax-df, fmax+df):
+                text=axs[0][0].text(f,s, int(x0[s,f]), ha="center", va="center", color="w")
+        plt.show()
+
+      C2 = deepcopy(C)
+      if RUC.refine_Umatrix:
+        ang, ax = RUC.get_correction_misset(as_axis_angle_deg=True)
+        C2.rotate_around_origin(ax, ang)
+        C2.set_B(RUC.get_refined_Bmatrix())
       
 
-    # refined unit cell parameters
-    ucell_ref = C2.get_unit_cell().parameters()
+      # refined unit cell parameters
+      ucell_ref = C2.get_unit_cell().parameters()
 
-    print("ground truth unit cell: %2.7g,%2.7g,%2.7g,%2.7g,%2.7g,%2.7g" % ucell)
-    print("refined unit cell: %2.7g,%2.7g,%2.7g,%2.7g,%2.7g,%2.7g" % ucell_ref)
-    print("")
+      print("ground truth unit cell: %2.7g,%2.7g,%2.7g,%2.7g,%2.7g,%2.7g" % ucell)
+      print("refined unit cell: %2.7g,%2.7g,%2.7g,%2.7g,%2.7g,%2.7g" % ucell_ref)
+      print("")
 
-    C2.show()
-    dump_exp = Experiment(imageset=data['cbf_imageset'], 
-                         beam=B,
-                         detector=D,
-                         goniometer=exp.goniometer,
-                         scan=exp.scan,
-                         crystal=C2)
-    dump_explist = ExperimentList([dump_exp])
-    dump_explist.as_file('after_refinement_%s.expt'%ts)
-    # Dump refl file as well based on prediction from refined model
-    if True:
-      from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
-      ref_predictor = ExperimentsPredictorFactory.from_experiments(
-                      dump_explist,
-                      force_stills=True,
-                      spherical_relp=False)
-      ref_predictor(indexed_reflections)
-      indexed_reflections.as_file('after_refinement_%s.refl'%ts)
+      C.show()
+      C2.show()
+      dump_exp = Experiment(imageset=data['cbf_imageset'], 
+                           beam=B,
+                           detector=D,
+                           goniometer=exp.goniometer,
+                           scan=exp.scan,
+                           crystal=C2)
+      dump_explist = ExperimentList([dump_exp])
+      dump_explist.as_file('after_refinement_%s_%s.expt'%(ts,n_cycle))
+      # Dump refl file as well based on prediction from refined model
+      if True:
+        from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
+        ref_predictor = ExperimentsPredictorFactory.from_experiments(
+                        dump_explist,
+                        force_stills=True,
+                        spherical_relp=False)
+        ref_predictor(indexed_reflections)
+        indexed_reflections.as_file('after_refinement_%s_%s.refl'%(ts,n_cycle))
+      C=C2 # For next round
 
+
+####################################################################################
 
     # Now display prediction on jungfrau
     if False:
