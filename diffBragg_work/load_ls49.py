@@ -202,15 +202,15 @@ if __name__ == "__main__":
 
 
     # Define number of macrocycles and strategies
-    n_macrocycles=5
+    n_macrocycles=1
 
-    ncells_strategy =          [True, False, True, False, False]
-    local_spotscale_strategy = [True, False, True, False, False]
-    crystal_scale_strategy =   [False,True, False, False, False]
+    ncells_strategy =          [True, False, True, True, False, True, True, False, True]
+    local_spotscale_strategy = [True, False, True, True, False, True, True, False, True]
+    crystal_scale_strategy =   [False,True, True, False, True, True, False, True, True]
 
-    background_strategy =      [False, True, False, False, False]
-    umat_strategy =            [False, True, False, True, True] 
-    bmat_strategy =            [False, True, False, True, False] 
+    background_strategy =      [False, True, True, False, True, True, False, True, True]
+    umat_strategy =            [False, True, True, False, True, True, False, True, True] 
+    bmat_strategy =            [False, True, True, False, True, True, False, True, True] 
 
     for n_cycle in range(n_macrocycles):
       if n_cycle==0:
@@ -295,6 +295,7 @@ if __name__ == "__main__":
           all_y.extend(flex.double(y.flatten()))
         z_regression=flex.linear_regression(all_x, all_y)
         z_correlation=flex.linear_correlation(all_x, all_y)
+        print ('Statistics for cycle %d'%n_cycle)
         print ('--------- Linear Regression Summary----------')
         z_regression.show_summary()
         print ('----------------------------------------------')
@@ -308,7 +309,7 @@ if __name__ == "__main__":
         print ('Skewness of Raw data = ', skew_obs) 
         print ('Skewness of Modelled data = ', skew_calc) 
       
-      if True and n_cycle==n_macrocycles-1:
+      if False and n_cycle==n_macrocycles-1:
         for i_spot in range(RUC.n_spots):
           fig, axs = plt.subplots(4,2)
           axs[0][0].imshow([[0, 1, 1], [0, 1, 2]])
@@ -393,7 +394,7 @@ if __name__ == "__main__":
       if RUC.refine_Umatrix:
         ang, ax = RUC.get_correction_misset(as_axis_angle_deg=True)
         C2.rotate_around_origin(ax, ang)
-        C2.set_B(RUC.get_refined_Bmatrix())
+      C2.set_B(RUC.get_refined_Bmatrix())
       
 
       # refined unit cell parameters
