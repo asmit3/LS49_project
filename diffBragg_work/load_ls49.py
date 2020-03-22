@@ -123,8 +123,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
             'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset}
 
 
-if __name__ == "__main__":
-    from argparse import ArgumentParser
+def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, params=None):
     from simtbx.diffBragg.refiners import RefineAll
     from simtbx.diffBragg.sim_data import SimData
     import numpy as np
@@ -135,46 +134,9 @@ if __name__ == "__main__":
     from dials.array_family import flex
     import pylab as plt
 
-    parser = ArgumentParser()
-    parser.add_argument("--plot", action='store_true')
-    parser.add_argument("--scaleonly", action='store_true')
-    args = parser.parse_args()
-
-
-    # Initial r0222 regression
-    timestamps_of_interest = ['20180501143533988', # bad
-                              '20180501143546717', # bad --> blows up
-                              '20180501143546817', # looks ok
-                              '20180501143547150', # does not work
-                              '20180501143548650', # blows up
-                              '20180501143549416', # does not seem to work
-                              '20180501143549949', # Look ok !
-                              '20180501143551715', # does not work
-                              '20180501143555114', # seems to get 50% of the spots
-                              '20180501143559313', # does not work
-                              '20180501143602713', # does not work
-                              '20180501143606545', # diverges
-                              '20180501143620206', # diverges it seems although does not crash 
-                              '20180501143625171', # diverges, not sure why ?
-                              '20180501143628702', # fails with assertion error in curvatures. Did not look good till then
-                              '20180501143628902', # Looks good actually
-                              '20180501143631168', # Failes with assertion error in curvatures like above. did not look good
-                              '20180501143632300', # Looks good 
-                              '20180501143640763', # Looks good
-                              '20180501143643462', # meehhh
-                              '20180501143643662', # Looks OK
-                              '20180501143652325', # curvature assertion error, looked good till then
-                              '20180501143701853'] # Does not work
-
-    ts = timestamps_of_interest[-2]
-    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
-    #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
-    #ts='20180501114703722'
-    #ts='20180501120317142'
-    ls49_data_dir=None
     data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5, ls49_data_dir=ls49_data_dir)
-
     refine_with_psf=True
+    plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
     C = data["dxcrystal"]
     D = data["dxdetector"]
@@ -203,16 +165,17 @@ if __name__ == "__main__":
 
     # Define number of macrocycles and strategies
     n_macrocycles=1
+    total_cycles=3*n_macrocycles
 
-    ncells_strategy =          [True, False, True, True, False, True, True, False, True]
-    local_spotscale_strategy = [True, False, True, True, False, True, True, False, True]
-    crystal_scale_strategy =   [False,True, True, False, True, True, False, True, True]
+    ncells_strategy =          [True, False, True]*n_macrocycles#, True, False, True, True, False, True]
+    local_spotscale_strategy = [True, False, True]*n_macrocycles#, True, False, True, True, False, True]
+    crystal_scale_strategy =   [False,True, True]*n_macrocycles#, False, True, True, False, True, True]
 
-    background_strategy =      [False, True, True, False, True, True, False, True, True]
-    umat_strategy =            [False, True, True, False, True, True, False, True, True] 
-    bmat_strategy =            [False, True, True, False, True, True, False, True, True] 
+    background_strategy =      [False, True, True]*n_macrocycles#, False, True, True, False, True, True]
+    umat_strategy =            [False, True, True]*n_macrocycles#, False, True, True, False, True, True] 
+    bmat_strategy =            [False, True, True]*n_macrocycles#, False, True, True, False, True, True] 
 
-    for n_cycle in range(n_macrocycles):
+    for n_cycle in range(total_cycles):
       if n_cycle==0:
         refined_ncells = Ncells_abc_0
         refined_scale = 1.0
@@ -253,7 +216,7 @@ if __name__ == "__main__":
           abc_init=refined_tilt_abc,
           img=data["data_img"],
           SimData_instance=SIM,
-          plot_images=args.plot,
+          plot_images=plot_images,
           ucell_manager=UcellMan,
           init_gain=refined_gain,
           init_scale=refined_scale,
@@ -309,7 +272,10 @@ if __name__ == "__main__":
         print ('Skewness of Raw data = ', skew_obs) 
         print ('Skewness of Modelled data = ', skew_calc) 
       
-      if False and n_cycle==n_macrocycles-1:
+      if n_cycle==0:
+        RUC0=RUC
+
+      if show_plotted_images and n_cycle==total_cycles-1:
         for i_spot in range(RUC.n_spots):
           fig, axs = plt.subplots(4,2)
           axs[0][0].imshow([[0, 1, 1], [0, 1, 2]])
@@ -325,8 +291,8 @@ if __name__ == "__main__":
           y = RUC.store_Imeas[i_spot]
           x1 = RUC.store_model_Lambda[i_spot]
           y1 = RUC.store_Imeas[i_spot]
-          x0 = RUC.store_init_model_Lambda[i_spot]
-          y0 = RUC.store_init_Imeas[i_spot]
+          x0 = RUC0.store_init_model_Lambda[i_spot]
+          y0 = RUC0.store_init_Imeas[i_spot]
           deltaI0 = np.abs(x0-y0)
           deltaI = np.abs(x-y)
         
@@ -334,8 +300,8 @@ if __name__ == "__main__":
           vmax = RUC.store_vmax[i_spot]
           vmin1 = RUC.store_vmin[i_spot]
           vmax1 = RUC.store_vmax[i_spot]
-          vmin0 = RUC.store_init_vmin[i_spot]
-          vmax0 = RUC.store_init_vmax[i_spot]
+          vmin0 = RUC0.store_init_vmin[i_spot]
+          vmax0 = RUC0.store_init_vmax[i_spot]
           axs[0][0].images[0].set_data(x0)
           axs[1][0].images[0].set_data(x1)
           axs[2][0].images[0].set_data(x)
@@ -413,7 +379,8 @@ if __name__ == "__main__":
                            scan=exp.scan,
                            crystal=C2)
       dump_explist = ExperimentList([dump_exp])
-      dump_explist.as_file('after_refinement_%s_%s.expt'%(ts,n_cycle))
+      if n_cycle==total_cycles-1:
+        dump_explist.as_file('after_refinement_%s_%s.expt'%(ts,n_cycle))
       # Dump refl file as well based on prediction from refined model
       if True:
         from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
@@ -422,7 +389,8 @@ if __name__ == "__main__":
                         force_stills=True,
                         spherical_relp=False)
         ref_predictor(indexed_reflections)
-        indexed_reflections.as_file('after_refinement_%s_%s.refl'%(ts,n_cycle))
+        if n_cycle==total_cycles-1:
+          indexed_reflections.as_file('after_refinement_%s_%s.refl'%(ts,n_cycle))
       C=C2 # For next round
 
 
@@ -466,21 +434,7 @@ if __name__ == "__main__":
       exit()
     exit()
 
-### Error message
-## 14. Assertion error
-'''
-Traceback (most recent call last):
-  File "load_ls49.py", line 246, in <module>
-    RUC.run(setup=False) # Now it will use curvatures
-  File "/Users/abhowmick/Desktop/software/dials/modules/cctbx_project/simtbx/diffBragg/refiners/pixel_refinement.py", line 224, in run
-    verbose=curvature_min_verbose)
-  File "/Users/abhowmick/Desktop/software/dials/modules/cctbx_project/scitbx/lbfgs/tst_curvatures.py", line 39, in lbfgs_run
-    requests_diag=requests_diag)
-  File "/Users/abhowmick/Desktop/software/dials/modules/cctbx_project/scitbx/lbfgs/tst_curvatures.py", line 116, in __call__
-    self._verify_diag()
-  File "/Users/abhowmick/Desktop/software/dials/modules/cctbx_project/scitbx/lbfgs/tst_curvatures.py", line 127, in _verify_diag
-    assert self.d.select(sel).all_gt(0)
-AssertionError
+if __name__ == "__main__":
     # Initial r0222 regression
     timestamps_of_interest = ['20180501143533988', # bad
                               '20180501143546717', # bad --> blows up
@@ -506,63 +460,12 @@ AssertionError
                               '20180501143652325', # curvature assertion error, looked good till then
                               '20180501143701853'] # Does not work
 
-
-    timestamps_of_interest = [
-                              '20180501143547850',
-                              '20180501143545684',
-                              '20180501143641996',
-                              '20180501143545184',
-                              '20180501143628303',
-                              '20180501143602713',
-                              '20180501143546817',
-                              '20180501143651959',
-                              '20180501143631101',
-                              '20180501143546717',
-                              '20180501143620206',
-                              '20180501143546017',
-                              '20180501143552248',
-                              '20180501143651292',
-                              '20180501143626270',
-                              '20180501143652325',
-                              '20180501143625171',
-                              '20180501143549949',
-                              '20180501143648827',
-                              '20180501143620239',
-                              '20180501143546983',
-                              '20180501143606545',
-                              '20180501143549216',
-                              '20180501143533988',
-                              '20180501143643462',
-                              '20180501143548650',
-                              '20180501143628902',
-                              '20180501143643662',
-                              '20180501143546883',
-                              '20180501143535254',
-                              '20180501143547150',
-                              '20180501143549416',
-                              '20180501143701853',
-                              '20180501143603279',
-                              '20180501143657722',
-                              '20180501143632300',
-                              '20180501143651092',
-                              '20180501143640763',
-                              '20180501143628702',
-                              '20180501143631568',
-                              '20180501143551715',
-                              '20180501143533955',
-                              '20180501143631201',
-                              '20180501143547483',
-                              '20180501143549183',
-                              '20180501143648193',
-                              '20180501143559313',
-                              '20180501143630268',
-                              '20180501143641130',
-                              '20180501143555114',
-                              '20180501143645328',
-                              '20180501143650626',
-                              '20180501143631168',
-                              '20180501143553215']
-
-'''
+    #ts = timestamps_of_interest[-2]
+    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
+    ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    ts='20180501114703722' # Image used in blog to compare on jungfrau
+    #ts='20180501120317142'
+    #ls49_data_dir=None
+    run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir)
 
 
