@@ -1,22 +1,4 @@
-def strong_spot_mask(refl_tbl, img_size):
-    """note only works for strong spot reflection tables
-    img_size is slow-scan, fast-scan"""
-    import numpy as np
-    from dials.algorithms.shoebox import MaskCode
-    Nrefl = len(refl_tbl)
-    masks = [ refl_tbl[i]['shoebox'].mask.as_numpy_array() for i in range(Nrefl)
-            ]
-    code = MaskCode.Foreground.real
-    x1, x2, y1, y2, z1, z2 = zip(*[ refl_tbl[i]['shoebox'].bbox for i in range(Nrefl)
-                                  ])
-    spot_mask = np.zeros(img_size, bool)
-    for i1, i2, j1, j2, M in zip(x1, x2, y1, y2, masks):
-        slcX = slice(i1, i2, 1)
-        slcY = slice(j1, j2, 1)
-        spot_mask[(slcY, slcX)] = M & code == code
-
-    return spot_mask
-
+from load_ls49 import strong_spot_mask
 
 def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
                             Nstrongest = 30,
@@ -134,19 +116,7 @@ def outlier_rejection_ls49(ts=None, ls49_data_dir=None, show_plotted_images=Fals
     Deff = 1000
     Ncells_abc_0 = np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
     n_spots = len(data['tilt_abc'])
-    init_local_spotscale = flex.double([1.0]*n_spots)
 
-
-    # Define number of macrocycles and strategies
-    total_cycles=1
-
-    refined_ncells = Ncells_abc_0
-    refined_scale = 1.0
-    refined_gain = 1.0
-    refined_local_spotscale = init_local_spotscale 
-    refined_tilt_abc=data['tilt_abc']
-
-    Ncells_abc=refined_ncells # Setting it here for cycles not equal to 0
     # Set up nbcryst and nbbeam
     nbcryst = nanoBragg_crystal.nanoBragg_crystal()
     nbcryst.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
@@ -171,7 +141,6 @@ def outlier_rejection_ls49(ts=None, ls49_data_dir=None, show_plotted_images=Fals
     SIM.D.show_params()
 
     #SIM.D.spot_scale = 1e6 # to guide your eye
-    #import matplotlib.pyplot as plt
     import pylab as plt
     plt.clf()
     fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
@@ -222,13 +191,6 @@ def outlier_rejection_ls49(ts=None, ls49_data_dir=None, show_plotted_images=Fals
       fig.canvas.draw()
       plt.pause(2.5)
    
-    #plt.imshow(img, vmax=vmax, vmin=vmin)
-    #plt.show()
-    #plt.imshow(data_img, vmax=vmax, vmin=vmin)
-    #plt.show()
-    #exit()
-
-
 if __name__ == "__main__":
     # Initial r0222 regression
     timestamps_of_interest = ['20180501143533988', # bad
