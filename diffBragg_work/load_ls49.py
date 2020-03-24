@@ -432,7 +432,6 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       plt.imshow(img, vmax=vmax, vmin=vmin)
       plt.show()
       exit()
-    exit()
 
 if __name__ == "__main__":
     # Initial r0222 regression
