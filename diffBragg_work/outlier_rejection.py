@@ -30,13 +30,16 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     cbf_imageset = loader.get_imageset([os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)])
     
     img = loader.get_raw_data().as_numpy_array() / GAIN
-    exp_list = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_refined.expt'%tstamp), check_format=False)
+    exp_list = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_refined.expt'%tstamp), check_format=False)[0:1]
     exp = exp_list[0]
     C = exp.crystal
     B = exp.beam
     D = exp.detector
     #refls = flex.reflection_table.from_file('idx-%s_indexed.refl' % tstamp)
     refls = flex.reflection_table.from_file(os.path.join(ls49_data_dir,'idx-%s_integrated.refl'%tstamp))
+    # Always choose the 0th lattice for now
+    refls=refls.select(refls['id']==0)
+    integ_expt = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_integrated.expt'%tstamp), check_format=False)[0:1]
     Nbefore = len(refls)
     refls = refls.select(flex.bool([resmin < d < resmax for d in refls['d']]))
     print("Kept %d out of %d refls in the res range %2.2f to %2.2f"
@@ -49,6 +52,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     bboxes[bboxes < 0] = 0
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
     R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_indexed.refl'%tstamp))
+    R2=R2.select(R2['id']==0)
     strong_mask = strong_spot_mask(refl_tbl=R2, img_size=img.shape)
     is_bg_pixel = np.logical_not(strong_mask)
     is_BAD_pixel = np.logical_not(pickle.load(open(os.path.join(ls49_data_dir,'../','mask_r4.pickle'), 'r'))[0].as_numpy_array())
@@ -67,8 +71,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max_energy - 3
-    max_energy_interpol = max_energy + 3
+    min_energy_interpol = max_energy - 35
+    max_energy_interpol = max_energy + 35
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
@@ -86,10 +90,10 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
-            'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset}
+            'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'integ_expt': integ_expt, 'integ_refl': refls}
 
 
-def outlier_rejection_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, params=None):
+def outlier_rejection_ls49(ts=None, ls49_data_dir=None, outdir=None, show_plotted_images=False, params=None):
     from simtbx.diffBragg.refiners import RefineAll
     from simtbx.diffBragg.sim_data import SimData
     import numpy as np
@@ -99,8 +103,12 @@ def outlier_rejection_ls49(ts=None, ls49_data_dir=None, show_plotted_images=Fals
     from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
     from dials.array_family import flex
     import pylab as plt
+    import os
 
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5, ls49_data_dir=ls49_data_dir)
+    if outdir is None:
+      outdir='.'
+
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=33, ls49_data_dir=ls49_data_dir)
     refine_with_psf=True
     plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
@@ -114,7 +122,7 @@ def outlier_rejection_ls49(ts=None, ls49_data_dir=None, show_plotted_images=Fals
     n_mos_domains=1
     a,b,c,_,_,_ = C.get_unit_cell().parameters()
     Deff = 1000
-    Ncells_abc_0 = np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
+    Ncells_abc = np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
     n_spots = len(data['tilt_abc'])
 
     # Set up nbcryst and nbbeam
@@ -146,9 +154,14 @@ def outlier_rejection_ls49(ts=None, ls49_data_dir=None, show_plotted_images=Fals
     fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
     ax1.imshow([[0, 1, 1], [0, 1, 2]])
     ax2.imshow([[0, 1, 1], [0, 1, 2]])
-    #ax3.imshow([[0, 1, 1], [0, 1, 2]])
+    show_plotted_images=True
     scale=1.0
+    keep_refl_bool=flex.bool()
     for i_spot in range(n_spots):
+      #fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
+      #ax1.imshow([[0, 1, 1], [0, 1, 2]])
+      #ax2.imshow([[0, 1, 1], [0, 1, 2]])
+      meets_criterion_for_keeping_refl=True
       bbox=data['bboxes_x1x2y1y2'][i_spot]
       a,b,c=data['tilt_abc'][i_spot]
       x1,x2,y1,y2=bbox
@@ -161,36 +174,70 @@ def outlier_rejection_ls49(ts=None, ls49_data_dir=None, show_plotted_images=Fals
       img=img[y1:y2+1, x1:x2+1]
       #img=tilt_plane+scale*img
       data_img=data['data_img'][y1:y2+1, x1:x2+1]-tilt_plane
-      data_img[data_img<0]=0
-      m = img[img>1.e-9].mean()
-      s = img[img>1.e-9].std()
-      vmin = 1
-      vmax = m+10*s
-      if vmax < vmin: vmax=vmin+10
-      m0 = data_img[data_img>1.e-9].mean()
-      s0 = data_img[data_img>1.e-9].std()
-      #print ('vmax0 %d  %d'%(i_spot, m0+5*s0)) 
-      #print ('vmax %d  %d'%(i_spot, m+5*s)) 
-      vmin0 = 1
-      vmax0 =  m0+10*s0
-      normalized_data_img=(data_img-np.mean(data_img))/np.std(data_img)
-      normalized_img=(img-np.mean(img))/np.std(img)
+      #data_img[data_img<0]=0
+
+      if show_plotted_images:
+
+        m = img[img>1.e-9].mean()
+        s = img[img>1.e-9].std()
+        vmin = 1
+        vmax = m+10*s
+        if vmax < vmin: vmax=vmin+10
+        m0 = data_img[data_img>1.e-9].mean()
+        s0 = data_img[data_img>1.e-9].std()
+        #print ('vmax0 %d  %d'%(i_spot, m0+5*s0)) 
+        #print ('vmax %d  %d'%(i_spot, m+5*s)) 
+        vmin0 = 1
+        vmax0 =  m0+10*s0
+        normalized_data_img=(data_img-np.mean(data_img))/np.std(data_img)
+        normalized_img=(img-np.mean(img))/np.std(img)
+        diff_normalized_img=normalized_img-normalized_data_img
     
       summed_I_data=np.sum(data_img)
       summed_I_model=np.sum(img)
-      print ('Summed Intensities: Data: %d     Model=%d'%(summed_I_data, summed_I_model))
-      diff_normalized_img=normalized_img-normalized_data_img
+      print ('Summed Intensities: Model: %d     Data=%d   Res = %.2f '%(summed_I_model, summed_I_data, data['resolution'][i_spot]))
+
+
+      if summed_I_model < 20:
+        meets_criterion_for_keeping_refl=False
+      if summed_I_data < 0 and summed_I_model > 1000:
+        meets_criterion_for_keeping_refl=False
+
+      if meets_criterion_for_keeping_refl:
+        keep_refl_bool.append(True)
+      else:
+        keep_refl_bool.append(False)
+        
        
-      
-      ax1.images[0].set_data(img)
-      ax1.images[0].set_clim(vmin, vmax)
-      ax2.images[0].set_data(data_img)
-      ax2.images[0].set_clim(vmin0, vmax0)
-      #ax3.images[0].set_data(diff_normalized_img)
-      plt.suptitle("Spot Number %d  ||   I_Model = %d   || I_Data= %d || Res= %.2f"%(i_spot, summed_I_model, summed_I_data, data['resolution'][i_spot]))
-      fig.canvas.draw()
-      plt.pause(2.5)
-   
+      if show_plotted_images: 
+        ax1.images[0].set_data(img)
+        ax1.images[0].set_clim(vmin, vmax)
+        ax2.images[0].set_data(data_img)
+        ax2.images[0].set_clim(vmin0, vmax0)
+        #ax3.images[0].set_data(diff_normalized_img)
+        plt.suptitle("Spot Number %d  ||   I_Model = %d   || I_Data= %d || Res= %.2f"%(i_spot, summed_I_model, summed_I_data, data['resolution'][i_spot]))
+        fig.canvas.draw()
+        #plt.pause(2)
+    #plt.show()
+    filtered_refls=data['integ_refl'].select(keep_refl_bool)
+    # Assuming only one expt in expt list when dumping
+    filtered_expt = Experiment(imageset=data['cbf_imageset'],
+                         beam=data['integ_expt'][0].beam,
+                         detector=data['integ_expt'][0].detector,
+                         goniometer=data['integ_expt'][0].goniometer,
+                         scan=data['integ_expt'][0].scan,
+                         crystal=data['integ_expt'][0].crystal)
+    filtered_expts = ExperimentList([filtered_expt])
+    # Also write out integration pickles for cxi.merge
+    from xfel.command_line.frame_extractor import ConstructFrame
+    from libtbx import easy_pickle
+    frame = ConstructFrame(filtered_refls, filtered_expt).make_frame()
+    frame["pixel_size"] = filtered_expt.detector[0].get_pixel_size()[0]
+    fname='int-0-'+ts+'.pickle'
+    outfile=os.path.join(outdir, fname)
+    easy_pickle.dump(outfile, frame)
+    return filtered_expts, filtered_reflections
+
 if __name__ == "__main__":
     # Initial r0222 regression
     timestamps_of_interest = ['20180501143533988', # bad
