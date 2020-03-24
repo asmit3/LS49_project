@@ -1,12 +1,14 @@
 from load_ls49 import strong_spot_mask
+import os
 
-def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
-                            Nstrongest = 30,
-                            resmax=12.0, resmin=3.0,
+def process_ls49_image_real(experiments_path,
+                            reflections_path,
+                            cbf_path,
+                            ls49_data_dir,
+                            tstamp,
                             #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
-                            ls49_data_dir=None):
+                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz'):
     import os, pickle, numpy as np
     from scipy.interpolate import interp1d
     import dxtbx
@@ -17,34 +19,19 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     import libtbx.load_env
     from dials.util import Sorry
 
-    if ls49_data_dir is None:
-      LS49_regression = libtbx.env.find_in_repositories(
-        relative_path="LS49_regression",
-        test=os.path.isdir)
-      if LS49_regression is None:
-        raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
-      ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_r0222_cori', 'rayonix_expt')
-
     GAIN = 0.75
-    loader = dxtbx.load(os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp))
-    cbf_imageset = loader.get_imageset([os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)])
+    loader = dxtbx.load(cbf_path)
+    cbf_imageset = loader.get_imageset([cbf_path])
     
     img = loader.get_raw_data().as_numpy_array() / GAIN
-    exp_list = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_refined.expt'%tstamp), check_format=False)[0:1]
+    exp_list = ExperimentListFactory.from_json_file(experiments_path, check_format=False)[0:1]
     exp = exp_list[0]
     C = exp.crystal
     B = exp.beam
     D = exp.detector
-    #refls = flex.reflection_table.from_file('idx-%s_indexed.refl' % tstamp)
-    refls = flex.reflection_table.from_file(os.path.join(ls49_data_dir,'idx-%s_integrated.refl'%tstamp))
+    refls = flex.reflection_table.from_file(reflections_path)
     # Always choose the 0th lattice for now
     refls=refls.select(refls['id']==0)
-    integ_expt = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_integrated.expt'%tstamp), check_format=False)[0:1]
-    Nbefore = len(refls)
-    refls = refls.select(flex.bool([resmin < d < resmax for d in refls['d']]))
-    print("Kept %d out of %d refls in the res range %2.2f to %2.2f"
-          % (len(refls), Nbefore, resmin, resmax))
-
     bboxes = [list(refls['shoebox'][i].bbox)[:4] for i in range(len(refls)) ]
     resolutions = [D[0].get_resolution_at_pixel(B.get_s0(), refls[i]['xyzobs.px.value'][0:2]) for i in range(len(refls))]
     bboxes = np.array(bboxes)
@@ -90,10 +77,10 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
-            'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'integ_expt': integ_expt, 'integ_refl': refls}
+            'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'integ_expt': exp_list, 'integ_refl': refls}
 
 
-def outlier_rejection_ls49(ts=None, ls49_data_dir=None, outdir=None, show_plotted_images=False, params=None):
+def outlier_rejection_ls49(experiments_path, reflections_path, cbf_path, ls49_data_dir=None, ts=None, outdir=None, show_plotted_images=False, dump_output_files=False):
     from simtbx.diffBragg.refiners import RefineAll
     from simtbx.diffBragg.sim_data import SimData
     import numpy as np
@@ -108,7 +95,7 @@ def outlier_rejection_ls49(ts=None, ls49_data_dir=None, outdir=None, show_plotte
     if outdir is None:
       outdir='.'
 
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=33, ls49_data_dir=ls49_data_dir)
+    data = process_ls49_image_real(experiments_path, reflections_path, cbf_path, ls49_data_dir=ls49_data_dir, tstamp=ts)
     refine_with_psf=True
     plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
@@ -233,10 +220,14 @@ def outlier_rejection_ls49(ts=None, ls49_data_dir=None, outdir=None, show_plotte
     from libtbx import easy_pickle
     frame = ConstructFrame(filtered_refls, filtered_expt).make_frame()
     frame["pixel_size"] = filtered_expt.detector[0].get_pixel_size()[0]
-    fname='int-0-'+ts+'.pickle'
+    fname='int-filtered-0-'+ts+'.pickle'
     outfile=os.path.join(outdir, fname)
-    easy_pickle.dump(outfile, frame)
-    return filtered_expts, filtered_reflections
+    if dump_output_files:
+      easy_pickle.dump(outfile, frame)
+      filtered_expts.as_file('idx-filtered_%s.expt'%ts)
+      filtered_refls.as_file('idx-filtered_%s.refl'%ts)
+
+    return filtered_expts, filtered_refls
 
 if __name__ == "__main__":
     # Initial r0222 regression
@@ -269,7 +260,22 @@ if __name__ == "__main__":
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
     #ts='20180501114703722' # Image used in blog to compare on jungfrau
     #ts='20180501120317142'
-    ls49_data_dir=None
-    outlier_rejection_ls49(ts=ts, ls49_data_dir=ls49_data_dir)
+    # On cori here is the path
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    # On my Macbook Pro, here is the path
+    #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    ts='20180501114703722' # Image used in blog to compare on jungfrau
+    experiments_path=os.path.join(ls49_data_dir,'idx-%s_integrated.expt'%ts)
+    reflections_path=os.path.join(ls49_data_dir,'idx-%s_integrated.refl'%ts)
+    cbf_path=os.path.join(ls49_data_dir, 'idx-%s.cbf'%ts)
+    #ls49_data_dir=None
+    if ls49_data_dir is None:
+      LS49_regression = libtbx.env.find_in_repositories(
+        relative_path="LS49_regression",
+        test=os.path.isdir)
+      if LS49_regression is None:
+        raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
+      ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_r0222_cori', 'rayonix_expt')
+    outlier_rejection_ls49(experiments_path, reflections_path, cbf_path, ls49_data_dir=ls49_data_dir, ts=ts)
 
 
