@@ -27,9 +27,10 @@ def strong_spot_mask(refl_tbl, img_size):
 def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
                             Nstrongest = 30,
                             resmax=12.0, resmin=3.0,
-                            #mtz_file='5cmv_Iobs.mtz',
+                            mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
+                            #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
+                            outlier_with_diffBragg=True,
                             ls49_data_dir=None):
     import os, pickle, numpy as np
     from scipy.interpolate import interp1d
@@ -40,6 +41,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     from iotbx import mtz
     import libtbx.load_env
     from dials.util import Sorry
+    from outlier_rejection import outlier_rejection_ls49
 
     if ls49_data_dir is None:
       LS49_regression = libtbx.env.find_in_repositories(
@@ -54,13 +56,18 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     cbf_imageset = loader.get_imageset([os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)])
     
     img = loader.get_raw_data().as_numpy_array() / GAIN
-    exp_list = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_refined.expt'%tstamp), check_format=False)
+    exp_list = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_integrated.expt'%tstamp), check_format=False)[0:1]
+    refls = flex.reflection_table.from_file(os.path.join(ls49_data_dir,'idx-%s_integrated.refl'%tstamp))
+    refls=refls.select(refls['id']==0)
+    # Filter reflections if necessary depending on predictions from diffBragg ?
+    if outlier_with_diffBragg:
+      exp_list, refls=outlier_rejection_ls49(exp_list, refls,ls49_data_dir=ls49_data_dir, ts=tstamp)
+
     exp = exp_list[0]
     C = exp.crystal
     B = exp.beam
     D = exp.detector
     #refls = flex.reflection_table.from_file('idx-%s_indexed.refl' % tstamp)
-    refls = flex.reflection_table.from_file(os.path.join(ls49_data_dir,'idx-%s_integrated.refl'%tstamp))
     Nbefore = len(refls)
     refls = refls.select(flex.bool([resmin < d < resmax for d in refls['d']]))
     print("Kept %d out of %d refls in the res range %2.2f to %2.2f"
@@ -101,8 +108,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max_energy - 15
-    max_energy_interpol = max_energy + 15
+    min_energy_interpol = max(max_energy - 35, min(chann_lambda))
+    max_energy_interpol = min(max_energy + 35, max(chann_lambda))
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
@@ -115,8 +122,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
 
     M = mtz.object(os.path.join(ls49_data_dir,'../',mtz_file))
-    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
-    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
+    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
+    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
@@ -133,6 +140,9 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
     from dials.array_family import flex
     import pylab as plt
+    import os
+    import dxtbx
+    from libtbx.easy_pickle import dump
 
     data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5, ls49_data_dir=ls49_data_dir)
     refine_with_psf=True
@@ -162,18 +172,17 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     n_spots = len(data['tilt_abc'])
     init_local_spotscale = flex.double([1.0]*n_spots)
 
-
     # Define number of macrocycles and strategies
-    n_macrocycles=1
-    total_cycles=3*n_macrocycles
+    n_macrocycles=3
+    total_cycles=9#3*n_macrocycles
 
-    ncells_strategy =          [True, False, True]*n_macrocycles#, True, False, True, True, False, True]
-    local_spotscale_strategy = [True, False, True]*n_macrocycles#, True, False, True, True, False, True]
-    crystal_scale_strategy =   [False,True, True]*n_macrocycles#, False, True, True, False, True, True]
+    ncells_strategy =          [True,  False, True,  False, False, True,  False, False, True]
+    local_spotscale_strategy = [False, False, False, False, False, False, False, False, False]
+    crystal_scale_strategy =   [True,  False, True,  False, False, True,  False,  False, True]
 
-    background_strategy =      [False, True, True]*n_macrocycles#, False, True, True, False, True, True]
-    umat_strategy =            [False, True, True]*n_macrocycles#, False, True, True, False, True, True] 
-    bmat_strategy =            [False, True, True]*n_macrocycles#, False, True, True, False, True, True] 
+    background_strategy =      [False, True,  True,  False, False, True,  False,  True,  True]
+    umat_strategy =            [False, True,  True,  True,  True,  True,  True,  True,  True] 
+    bmat_strategy =            [False, True,  True,  False, True,  True,  False,  True,  True] 
 
     for n_cycle in range(total_cycles):
       if n_cycle==0:
@@ -396,42 +405,76 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
 
 ####################################################################################
 
-    # Now display prediction on jungfrau
-    if False:
-      D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
+      # Now display prediction on jungfrau
+      # Do it on a cycle by cycle basis
+      if True:
+        cbf_jungfrau_path=os.path.join(ls49_data_dir, '../', 'jungfrau_cbf','jungfrauhit_%s.cbf'%ts )
+        loader = dxtbx.load(cbf_jungfrau_path)
+        cbf_imageset = loader.get_imageset([cbf_jungfrau_path])
+        img=cbf_imageset.get_raw_data(0)
+        assembled_img=np.zeros([1024, 1024])
+        assembled_img[0:256, 0:256]=img[4].as_numpy_array()[::-1, :]
+        assembled_img[0:256, 256:512]=img[5].as_numpy_array()[::-1, :]
+        assembled_img[0:256, 512:768]=img[6].as_numpy_array()[::-1, :]
+        assembled_img[0:256, 768:1024]=img[7].as_numpy_array()[::-1, :]
 
-      nbcryst_final = nanoBragg_crystal.nanoBragg_crystal()
-      nbcryst_final.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
-      nbcryst_final.mos_spread_deg = mos_spread_deg
-      nbcryst_final.n_mos_domains = n_mos_domains
-      nbcryst_final.thick_mm = 0.005
-      nbcryst_final.miller_array = data["sfall"]
-      nbcryst_final.dxtbx_crystal = C2
+        assembled_img[256:512, 0:256]=img[0].as_numpy_array()[::-1, :]
+        assembled_img[256:512, 256:512]=img[1].as_numpy_array()[::-1, :]
+        assembled_img[256:512, 512:768]=img[2].as_numpy_array()[::-1, :]
+        assembled_img[256:512, 768:1024]=img[3].as_numpy_array()[::-1, :]
 
-      SIM_jung = SimData()
-      SIM_jung.crystal = nbcryst_final
-      SIM_jung.detector = D #D_jung
-      SIM_jung.beam = nbbeam
+        assembled_img[512:768, 0:256]=img[12].as_numpy_array()[::-1, :]
+        assembled_img[512:768, 256:512]=img[13].as_numpy_array()[::-1, :]
+        assembled_img[512:768, 512:768]=img[14].as_numpy_array()[::-1, :]
+        assembled_img[512:768, 768:1024]=img[15].as_numpy_array()[::-1, :]
 
-      SIM_jung.instantiate_diffBragg(adc_offset=0,
-                                oversample=0,
-                                interpolate=0,
-                                verbose=0)
-      SIM_jung.D.show_params()
-      SIM_jung.D.spot_scale = 1e6 # to guide your eye
-      SIM_jung.panel_id = 0
-      SIM_jung.D.add_diffBragg_spots()
-      img=SIM_jung.D.raw_pixels.as_numpy_array()
-      import matplotlib.pyplot as plt
-      m = img[img>1.e-9].mean()
-      s = img[img>1.e-9].std()
-      vmin = 1
-      vmax = 1000 #m+5*s
-      plt.imshow(img, vmax=vmax, vmin=vmin)
-      plt.show()
-      plt.imshow(img, vmax=vmax, vmin=vmin)
-      plt.show()
-      exit()
+        assembled_img[768:1024, 0:256 ]=img[8].as_numpy_array()[::-1, :]
+        assembled_img[768:1024, 256:512]=img[9].as_numpy_array()[::-1, :]
+        assembled_img[768:1024, 512:768]=img[10].as_numpy_array()[::-1, :]
+        assembled_img[768:1024, 768:1024]=img[11].as_numpy_array()[::-1, :]
+
+        D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/fake_jungfrau_from_rayonix.expt', check_format=False)[0].detector
+        #D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
+
+        nbcryst_final = nanoBragg_crystal.nanoBragg_crystal()
+        nbcryst_final.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
+        nbcryst_final.mos_spread_deg = mos_spread_deg
+        nbcryst_final.n_mos_domains = n_mos_domains
+        nbcryst_final.thick_mm = 0.005
+        nbcryst_final.miller_array = data["sfall"]
+        nbcryst_final.dxtbx_crystal = C2
+
+        SIM_jung = SimData()
+        SIM_jung.crystal = nbcryst_final
+        SIM_jung.detector = D_jung
+        SIM_jung.beam = nbbeam
+
+        SIM_jung.instantiate_diffBragg(adc_offset=0,
+                                  oversample=0,
+                                  interpolate=0,
+                                  verbose=0)
+        SIM_jung.D.show_params()
+        SIM_jung.D.spot_scale = 1e6 # to guide your eye
+        SIM_jung.panel_id = 0
+        SIM_jung.D.add_diffBragg_spots()
+        img=SIM_jung.D.raw_pixels.as_numpy_array()
+        import pylab as plt
+        plt.clf()
+        fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
+        ax1.imshow([[0, 1, 1], [0, 1, 2]])
+        ax2.imshow([[0, 1, 1], [0, 1, 2]])
+        m = assembled_img[assembled_img>1.e-9].mean()
+        s = assembled_img[assembled_img>1.e-9].std()
+        vmin = 1
+        vmax = 300#m+5*s
+        ax1.images[0].set_data(assembled_img)
+        ax1.images[0].set_clim(vmin, vmax)
+        ax2.images[0].set_data(img)
+        ax2.images[0].set_clim(1, 1000)
+        if (n_cycle+1)%3==0:
+          dump('jungfrau_pred_%s_%d.pickle'%(ts, n_cycle), fig )
+        print ('Dumped Jungfrau Prediction for %d cycle'%n_cycle)
+        #plt.show()
 
 if __name__ == "__main__":
     # Initial r0222 regression
@@ -461,9 +504,12 @@ if __name__ == "__main__":
 
     #ts = timestamps_of_interest[-2]
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
-    ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
-    ts='20180501114703722' # Image used in blog to compare on jungfrau
-    #ts='20180501120317142'
+    # On cori here is the path
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    # On my Macbook Pro, here is the path
+    #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    #ts='20180501114703722' # Image used in blog to compare on jungfrau
+    ts='20180501120317142'
     #ls49_data_dir=None
     run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir)
 

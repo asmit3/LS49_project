@@ -1,9 +1,8 @@
 from load_ls49 import strong_spot_mask
 import os
 
-def process_ls49_image_real(experiments_path,
-                            reflections_path,
-                            cbf_path,
+def process_ls49_image_real2(experiments,
+                            reflections,
                             ls49_data_dir,
                             tstamp,
                             #mtz_file='5cmv_Iobs.mtz',
@@ -20,16 +19,18 @@ def process_ls49_image_real(experiments_path,
     from dials.util import Sorry
 
     GAIN = 0.75
+
+    cbf_path=os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)
     loader = dxtbx.load(cbf_path)
     cbf_imageset = loader.get_imageset([cbf_path])
     
     img = loader.get_raw_data().as_numpy_array() / GAIN
-    exp_list = ExperimentListFactory.from_json_file(experiments_path, check_format=False)[0:1]
+    exp_list=experiments[0:1]
     exp = exp_list[0]
     C = exp.crystal
     B = exp.beam
     D = exp.detector
-    refls = flex.reflection_table.from_file(reflections_path)
+    refls=reflections
     # Always choose the 0th lattice for now
     refls=refls.select(refls['id']==0)
     bboxes = [list(refls['shoebox'][i].bbox)[:4] for i in range(len(refls)) ]
@@ -58,8 +59,8 @@ def process_ls49_image_real(experiments_path,
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max_energy - 35
-    max_energy_interpol = max_energy + 35
+    min_energy_interpol = max(max_energy - 35, min(chann_lambda))
+    max_energy_interpol = min(max_energy + 35, max(chann_lambda))
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
@@ -80,7 +81,7 @@ def process_ls49_image_real(experiments_path,
             'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'integ_expt': exp_list, 'integ_refl': refls}
 
 
-def outlier_rejection_ls49(experiments_path, reflections_path, cbf_path, ls49_data_dir=None, ts=None, outdir=None, show_plotted_images=False, dump_output_files=False):
+def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None, outdir=None, show_plotted_images=False, dump_output_files=False):
     from simtbx.diffBragg.refiners import RefineAll
     from simtbx.diffBragg.sim_data import SimData
     import numpy as np
@@ -95,7 +96,7 @@ def outlier_rejection_ls49(experiments_path, reflections_path, cbf_path, ls49_da
     if outdir is None:
       outdir='.'
 
-    data = process_ls49_image_real(experiments_path, reflections_path, cbf_path, ls49_data_dir=ls49_data_dir, tstamp=ts)
+    data = process_ls49_image_real2(experiments, reflections,ls49_data_dir=ls49_data_dir, tstamp=ts)
     refine_with_psf=True
     plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
@@ -141,7 +142,7 @@ def outlier_rejection_ls49(experiments_path, reflections_path, cbf_path, ls49_da
     fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
     ax1.imshow([[0, 1, 1], [0, 1, 2]])
     ax2.imshow([[0, 1, 1], [0, 1, 2]])
-    show_plotted_images=True
+    #show_plotted_images=True
     scale=1.0
     keep_refl_bool=flex.bool()
     for i_spot in range(n_spots):
@@ -204,7 +205,7 @@ def outlier_rejection_ls49(experiments_path, reflections_path, cbf_path, ls49_da
         #ax3.images[0].set_data(diff_normalized_img)
         plt.suptitle("Spot Number %d  ||   I_Model = %d   || I_Data= %d || Res= %.2f"%(i_spot, summed_I_model, summed_I_data, data['resolution'][i_spot]))
         fig.canvas.draw()
-        #plt.pause(2)
+        plt.pause(2)
     #plt.show()
     filtered_refls=data['integ_refl'].select(keep_refl_bool)
     # Assuming only one expt in expt list when dumping
@@ -230,6 +231,8 @@ def outlier_rejection_ls49(experiments_path, reflections_path, cbf_path, ls49_da
     return filtered_expts, filtered_refls
 
 if __name__ == "__main__":
+    from dxtbx.model.experiment_list import ExperimentListFactory
+    from dials.array_family import flex
     # Initial r0222 regression
     timestamps_of_interest = ['20180501143533988', # bad
                               '20180501143546717', # bad --> blows up
@@ -267,7 +270,9 @@ if __name__ == "__main__":
     ts='20180501114703722' # Image used in blog to compare on jungfrau
     experiments_path=os.path.join(ls49_data_dir,'idx-%s_integrated.expt'%ts)
     reflections_path=os.path.join(ls49_data_dir,'idx-%s_integrated.refl'%ts)
-    cbf_path=os.path.join(ls49_data_dir, 'idx-%s.cbf'%ts)
+    experiments=ExperimentListFactory.from_json_file(experiments_path, check_format=False)[0:1]
+    reflections=flex.reflection_table.from_file(reflections_path)
+    reflections=reflections.select(reflections['id']==0)
     #ls49_data_dir=None
     if ls49_data_dir is None:
       LS49_regression = libtbx.env.find_in_repositories(
@@ -276,6 +281,6 @@ if __name__ == "__main__":
       if LS49_regression is None:
         raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
       ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_r0222_cori', 'rayonix_expt')
-    outlier_rejection_ls49(experiments_path, reflections_path, cbf_path, ls49_data_dir=ls49_data_dir, ts=ts)
+    outlier_rejection_ls49(experiments, reflections,ls49_data_dir=ls49_data_dir, ts=ts, show_plotted_images=True)
 
 
