@@ -1,6 +1,11 @@
 from load_ls49 import strong_spot_mask
 import os
 
+
+def find_spots(cbf_path):
+  pass
+
+
 def process_ls49_image_real2(experiments,
                             reflections,
                             ls49_data_dir,
@@ -23,6 +28,8 @@ def process_ls49_image_real2(experiments,
     cbf_path=os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)
     loader = dxtbx.load(cbf_path)
     cbf_imageset = loader.get_imageset([cbf_path])
+    # Do spotfinding here as well
+     
     
     img = loader.get_raw_data().as_numpy_array() / GAIN
     exp_list=experiments[0:1]
@@ -90,7 +97,7 @@ def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None,
     from copy import deepcopy
     from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
     from dials.array_family import flex
-    import pylab as plt
+    #import pylab as plt
     import os
 
     if outdir is None:
@@ -137,12 +144,13 @@ def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None,
     SIM.D.show_params()
 
     #SIM.D.spot_scale = 1e6 # to guide your eye
-    import pylab as plt
-    plt.clf()
-    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
-    ax1.imshow([[0, 1, 1], [0, 1, 2]])
-    ax2.imshow([[0, 1, 1], [0, 1, 2]])
-    #show_plotted_images=True
+    if show_plotted_images:
+      import pylab as plt
+      plt.clf()
+      fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
+      ax1.imshow([[0, 1, 1], [0, 1, 2]])
+      ax2.imshow([[0, 1, 1], [0, 1, 2]])
+      #show_plotted_images=True
     scale=1.0
     keep_refl_bool=flex.bool()
     for i_spot in range(n_spots):
@@ -190,6 +198,10 @@ def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None,
         meets_criterion_for_keeping_refl=False
       if summed_I_data < 0 and summed_I_model > 1000:
         meets_criterion_for_keeping_refl=False
+
+      #if has_multiple_spots_in_shoebox():
+      #  meets_criterion_for_keeping_refl=False
+
 
       if meets_criterion_for_keeping_refl:
         keep_refl_bool.append(True)

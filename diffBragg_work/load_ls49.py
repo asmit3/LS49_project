@@ -27,9 +27,9 @@ def strong_spot_mask(refl_tbl, img_size):
 def process_ls49_image_real(tstamp='20180501143555114', #tstamp='20180501143559313',
                             Nstrongest = 30,
                             resmax=12.0, resmin=3.0,
-                            mtz_file='5cmv_Iobs.mtz',
+                            #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
+                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             outlier_with_diffBragg=True,
                             ls49_data_dir=None):
     import os, pickle, numpy as np
@@ -51,7 +51,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
       ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_r0222_cori', 'rayonix_expt')
 
-    GAIN = 0.75
+    GAIN = 1.0
     loader = dxtbx.load(os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp))
     cbf_imageset = loader.get_imageset([os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)])
     
@@ -63,12 +63,42 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     if outlier_with_diffBragg:
       exp_list, refls=outlier_rejection_ls49(exp_list, refls,ls49_data_dir=ls49_data_dir, ts=tstamp)
 
+    # Also reject multiple lattice spots at this stage 
+    if True:
+      print ('Rejecting multiple lattices')
+      keep_refls = flex.bool(len(refls), True)
+      strong_refls=flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_strong.refl'%tstamp))
+      for ii, refl in enumerate(refls.rows()):
+        lattice_count=0
+        for strong_refl in strong_refls.rows():
+          x1,x2,y1,y2,z1,z2=refl['bbox']
+          x,y,z=strong_refl['xyzobs.px.value']
+          if x > x1 and x < x2 and y > y1 and y < y2:
+            lattice_count +=1
+        if lattice_count >1:
+          print ('Multiple Lattice spotted here:',refl['xyzobs.px.value'], ii)
+          keep_refls[ii]=False
+      #from IPython import embed; embed(); exit() 
+      refls=refls.select(keep_refls)
+     
+
     exp = exp_list[0]
     C = exp.crystal
     B = exp.beam
     D = exp.detector
     #refls = flex.reflection_table.from_file('idx-%s_indexed.refl' % tstamp)
     Nbefore = len(refls)
+    # Keep validation reflections here using inverse logic of refls selection
+    # SHould only use low res reflections for validation
+    bool_list = [2.5 < d < 13.5 for d in refls['d']] 
+    #bool_list = [not myval for myval in bool_list]
+    refls_validation = refls.select(flex.bool(bool_list))
+    min_snr=3.0
+    snr = refls_validation['intensity.sum.value'] / flex.sqrt(refls_validation['intensity.sum.variance'])
+    order = np.argsort(snr)[::-1] 
+    refls_validation=refls_validation.select(snr>min_snr) 
+    # End validation  related 
+    #
     refls = refls.select(flex.bool([resmin < d < resmax for d in refls['d']]))
     print("Kept %d out of %d refls in the res range %2.2f to %2.2f"
           % (len(refls), Nbefore, resmin, resmax))
@@ -83,11 +113,23 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     sorted_indices_by_resolution = flex.sort_permutation(refls['d'], reverse=False)
     refls = refls.select(sorted_indices_by_resolution[0:Nstrongest])
 
+
+    # Special case please remove
+    refls_validation=refls
+
     bboxes = [list(refls['shoebox'][i].bbox)[:4] for i in range(len(refls)) ]
     resolutions = [D[0].get_resolution_at_pixel(B.get_s0(), refls[i]['xyzobs.px.value'][0:2]) for i in range(len(refls))]
     bboxes = np.array(bboxes)
     bboxes[bboxes > 960] = 959
     bboxes[bboxes < 0] = 0
+
+
+    # validation stuff
+    bboxes_validation = [list(refls_validation['shoebox'][i].bbox)[:4] for i in range(len(refls_validation)) ]
+    bboxes_validation = np.array(bboxes_validation)
+    bboxes_validation[bboxes_validation > 960] = 959
+    bboxes_validation[bboxes_validation < 0] = 0
+    # end validation stuff
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
     R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_indexed.refl'%tstamp))
     strong_mask = strong_spot_mask(refl_tbl=R2, img_size=img.shape)
@@ -103,13 +145,24 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         tilt, bgmask, coeff, _ = utils.tilting_plane(shoebox_img, mask=shoebox_mask, zscore=2)
         tilts.append(tilt)
         tilt_abc[i_spot] = (coeff[1], coeff[2], coeff[0])
+    # validation start
+    num_spots_validation=len(refls_validation)
+    tilt_abc_validation = np.zeros((num_spots_validation, 3))
+    tilts_validation = []
+    for i_spot, (i1, i2, j1, j2) in enumerate(bboxes_validation):
+        shoebox_img = img[j1:j2, i1:i2]
+        shoebox_mask = is_bg_pixel[j1:j2, i1:i2]
+        tilt, bgmask, coeff, _ = utils.tilting_plane(shoebox_img, mask=shoebox_mask, zscore=2)
+        tilts_validation.append(tilt)
+        tilt_abc_validation[i_spot] = (coeff[1], coeff[2], coeff[0])
+    # end validation
 
     fee_file='idx-fee_data_%s.pickle'%tstamp
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max(max_energy - 35, min(chann_lambda))
-    max_energy_interpol = min(max_energy + 35, max(chann_lambda))
+    min_energy_interpol = max(max_energy - 15, min(chann_lambda))
+    max_energy_interpol = min(max_energy + 15, max(chann_lambda))
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
@@ -122,15 +175,15 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
 
     M = mtz.object(os.path.join(ls49_data_dir,'../',mtz_file))
-    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
-    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
+    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
+    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
-            'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset}
+            'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'refls_validation': refls_validation, 'bboxes_validation': bboxes_validation, 'tilt_abc_validation': tilt_abc_validation}
 
 
-def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, params=None):
+def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None):
     from simtbx.diffBragg.refiners import RefineAll
     from simtbx.diffBragg.sim_data import SimData
     import numpy as np
@@ -139,12 +192,15 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     from copy import deepcopy
     from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
     from dials.array_family import flex
-    import pylab as plt
     import os
     import dxtbx
     from libtbx.easy_pickle import dump
 
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=13.5, ls49_data_dir=ls49_data_dir)
+    if outdir is None:
+      outdir='.'
+
+    print ('Inside run_all_refine_ls49: Starting processing')
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=5, resmin=2.3, resmax=3.5, ls49_data_dir=ls49_data_dir)
     refine_with_psf=True
     plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
@@ -160,8 +216,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
                          scan=exp.scan,
                          crystal=C)
     dump_explist = ExperimentList([dump_exp])
-    dump_explist.as_file('before_refinement_%s.expt'%ts)
-    indexed_reflections.as_file('before_refinement_%s.refl'%ts)
+    dump_explist.as_file(os.path.join(outdir, 'before_refinement_%s.expt'%ts))
+    indexed_reflections.as_file(os.path.join(outdir, 'before_refinement_%s.refl'%ts))
 
     # Some global variables here for LS49
     mos_spread_deg=0.001
@@ -173,18 +229,27 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     init_local_spotscale = flex.double([1.0]*n_spots)
 
     # Define number of macrocycles and strategies
-    n_macrocycles=3
-    total_cycles=9#3*n_macrocycles
+    n_macrocycles=1
+    total_cycles=4*n_macrocycles+1
 
-    ncells_strategy =          [True,  False, True,  False, False, True,  False, False, True]
-    local_spotscale_strategy = [False, False, False, False, False, False, False, False, False]
-    crystal_scale_strategy =   [True,  False, True,  False, False, True,  False,  False, True]
+    #ncells_strategy =          [True,  False, False,  False, True,  False, False, False,  False, False, False, True,  False,  False, False, True,  False,  False,  False, True]
+    #local_spotscale_strategy = [False, False, False,  False, False, False, False, False,  False, False, False, False, False,  False, False, False, False,  False,  False, False]
+    #crystal_scale_strategy =   [True,  False, False,  False, True,  False, False, False,  False, False, False, True,  False,  False, False, True,  False,  False,  False, True]
 
-    background_strategy =      [False, True,  True,  False, False, True,  False,  True,  True]
-    umat_strategy =            [False, True,  True,  True,  True,  True,  True,  True,  True] 
-    bmat_strategy =            [False, True,  True,  False, True,  True,  False,  True,  True] 
+    #background_strategy =      [False, False,  False, True,  False,  False, False, True,  False, False, True,  False, False,  False, True,  False,  False, False,  True,  True]
+    #umat_strategy =            [False, True,   False, False, False,  True,  False, False, True,  False, False, False, True,   False, False, False,  True,  False,  False, True] 
+    #bmat_strategy =            [False, False,  True,  False, False,  False, True,  False, False, True,  False, False, False,  True,  False, False,  False, True,   False, True] 
+    ncells_strategy =          [True, False, False, False]*n_macrocycles+  [True]
+    local_spotscale_strategy = [True, False, False, False]*n_macrocycles+ [True]
+    crystal_scale_strategy =   [False, False, False, False]*n_macrocycles+  [False]
+
+    background_strategy =      [False, False, False, True]*n_macrocycles+  [True]
+    umat_strategy =            [False, True, False, False]*n_macrocycles + [True]
+    bmat_strategy =            [False, False, True, False]*n_macrocycles + [True]
+    
 
     for n_cycle in range(total_cycles):
+      print ('Refinement cycle %d for timestamp %s'%(n_cycle, ts))
       if n_cycle==0:
         refined_ncells = Ncells_abc_0
         refined_scale = 1.0
@@ -226,6 +291,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
           img=data["data_img"],
           SimData_instance=SIM,
           plot_images=plot_images,
+          show_plotted_images=show_plotted_images,
           ucell_manager=UcellMan,
           init_gain=refined_gain,
           init_scale=refined_scale,
@@ -267,7 +333,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
           all_y.extend(flex.double(y.flatten()))
         z_regression=flex.linear_regression(all_x, all_y)
         z_correlation=flex.linear_correlation(all_x, all_y)
-        print ('Statistics for cycle %d'%n_cycle)
+        print ('Statistics for cycle %d and timestamp %s'%(n_cycle, ts))
         print ('--------- Linear Regression Summary----------')
         z_regression.show_summary()
         print ('----------------------------------------------')
@@ -285,6 +351,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
         RUC0=RUC
 
       if show_plotted_images and n_cycle==total_cycles-1:
+        import pylab as plt
         for i_spot in range(RUC.n_spots):
           fig, axs = plt.subplots(4,2)
           axs[0][0].imshow([[0, 1, 1], [0, 1, 2]])
@@ -389,7 +456,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
                            crystal=C2)
       dump_explist = ExperimentList([dump_exp])
       if n_cycle==total_cycles-1:
-        dump_explist.as_file('after_refinement_%s_%s.expt'%(ts,n_cycle))
+        dump_explist.as_file(os.path.join(outdir, 'after_refinement_%s_%s.expt'%(ts,n_cycle)))
       # Dump refl file as well based on prediction from refined model
       if True:
         from dials.algorithms.refinement.prediction.managed_predictors import ExperimentsPredictorFactory
@@ -399,15 +466,104 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
                         spherical_relp=False)
         ref_predictor(indexed_reflections)
         if n_cycle==total_cycles-1:
-          indexed_reflections.as_file('after_refinement_%s_%s.refl'%(ts,n_cycle))
+          indexed_reflections.as_file(os.path.join(outdir, 'after_refinement_%s_%s.refl'%(ts,n_cycle)))
       C=C2 # For next round
 
+###################################################################################
+#  Rayonix validation: Predict on all shoeboxes in rayonix and then calculate statistics
+      if True:
+        refls_validation=data['refls_validation']
+
+        nbcryst_validate_ray = nanoBragg_crystal.nanoBragg_crystal()
+        nbcryst_validate_ray.Ncells_abc = refined_ncells, refined_ncells, refined_ncells
+        nbcryst_validate_ray.mos_spread_deg = mos_spread_deg
+        nbcryst_validate_ray.n_mos_domains = n_mos_domains
+        nbcryst_validate_ray.thick_mm = 0.005
+        nbcryst_validate_ray.miller_array = data["sfall"]
+        nbcryst_validate_ray.dxtbx_crystal = C2
+
+        SIM_validate_ray = SimData()
+        SIM_validate_ray.crystal = nbcryst_validate_ray
+        SIM_validate_ray.detector = D
+        SIM_validate_ray.beam = nbbeam
+
+        SIM_validate_ray.instantiate_diffBragg(adc_offset=0,
+                                  oversample=0,
+                                  interpolate=0,
+                                  verbose=0)
+        SIM_validate_ray.D.show_params()
+        #SIM_jung.D.spot_scale = 1e6 # to guide your eye
+        scale=refined_scale
+        n_spots_validation = len(data['tilt_abc_validation'])
+        show_validation_images=True
+        if show_validation_images:
+          import pylab as plt
+          plt.clf()
+          fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
+          ax1.imshow([[0, 1, 1], [0, 1, 2]])
+          ax2.imshow([[0, 1, 1], [0, 1, 2]])
+        all_x = flex.double()
+        all_y = flex.double()
+        for i_spot in range(n_spots_validation):
+          print ('Spot number = ', i_spot)
+          bbox=data['bboxes_validation'][i_spot]
+          a,b,c=data['tilt_abc_validation'][i_spot]
+          x1,x2,y1,y2=bbox
+          yr, xr = np.indices((y2-y1+1, x2-x1+1))
+          tilt_plane=xr*a+yr*b+c
+          SIM_validate_ray.D.region_of_interest=((bbox[0], bbox[1]), (bbox[2], bbox[3]))
+          SIM_validate_ray.D.add_diffBragg_spots()
+          img2=SIM_validate_ray.D.raw_pixels.as_numpy_array()
+          img2=img2[y1:y2+1, x1:x2+1]
+
+          img=tilt_plane+scale*scale*img2
+
+          if refine_with_psf:
+            from simtbx.diffBragg.utils import convolve_with_psf
+            img=convolve_with_psf(img)
+          data_img=data['data_img'][y1:y2+1, x1:x2+1]
+          x = img 
+          y = data_img
+          #from IPython import embed; embed(); exit()
+          all_x.extend(flex.double(x.flatten()))
+          all_y.extend(flex.double(y.flatten()))
+
+          if show_validation_images:
+            m = img[img>1.e-9].mean()
+            s = img[img>1.e-9].std()
+            vmin = 1
+            vmax = m+10*s
+            if vmax < vmin: vmax=vmin+10
+            m0 = data_img[data_img>1.e-9].mean()
+            s0 = data_img[data_img>1.e-9].std()
+            #print ('vmax0 %d  %d'%(i_spot, m0+5*s0)) 
+            #print ('vmax %d  %d'%(i_spot, m+5*s)) 
+            vmin0 = 1
+            vmax0 =  m0+10*s0
+
+            ax1.images[0].set_data(img)
+            ax1.images[0].set_clim(vmin, vmax)
+            ax2.images[0].set_data(data_img)
+            ax2.images[0].set_clim(vmin0, vmax0)
+            plt.suptitle('Spot Number: %d, Res = %.2f'%(i_spot, refls_validation['d'][i_spot]))
+            fig.canvas.draw()
+            plt.pause(1)
+        z_regression=flex.linear_regression(all_x, all_y)
+        z_correlation=flex.linear_correlation(all_x, all_y)
+        print ('Validation for cycle %d and timestamp %s'%(n_cycle, ts))
+        print ('--------- Linear Regression Summary----------')
+        z_regression.show_summary()
+        print ('----------------------------------------------')
+
+
+###################################################################################
+###################################################################################
 
 ####################################################################################
 
       # Now display prediction on jungfrau
       # Do it on a cycle by cycle basis
-      if True:
+      if False:
         cbf_jungfrau_path=os.path.join(ls49_data_dir, '../', 'jungfrau_cbf','jungfrauhit_%s.cbf'%ts )
         loader = dxtbx.load(cbf_jungfrau_path)
         cbf_imageset = loader.get_imageset([cbf_jungfrau_path])
@@ -433,7 +589,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
         assembled_img[768:1024, 512:768]=img[10].as_numpy_array()[::-1, :]
         assembled_img[768:1024, 768:1024]=img[11].as_numpy_array()[::-1, :]
 
-        D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/fake_jungfrau_from_rayonix.expt', check_format=False)[0].detector
+        D_jung = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir, '../', 'fake_jungfrau_from_rayonix.expt'), check_format=False)[0].detector
         #D_jung = ExperimentListFactory.from_json_file('../jungfrau_scripts/rotated_plus_90.json', check_format=False)[0].detector
 
         nbcryst_final = nanoBragg_crystal.nanoBragg_crystal()
@@ -458,22 +614,27 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
         SIM_jung.panel_id = 0
         SIM_jung.D.add_diffBragg_spots()
         img=SIM_jung.D.raw_pixels.as_numpy_array()
-        import pylab as plt
-        plt.clf()
-        fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
-        ax1.imshow([[0, 1, 1], [0, 1, 2]])
-        ax2.imshow([[0, 1, 1], [0, 1, 2]])
-        m = assembled_img[assembled_img>1.e-9].mean()
-        s = assembled_img[assembled_img>1.e-9].std()
-        vmin = 1
-        vmax = 300#m+5*s
-        ax1.images[0].set_data(assembled_img)
-        ax1.images[0].set_clim(vmin, vmax)
-        ax2.images[0].set_data(img)
-        ax2.images[0].set_clim(1, 1000)
-        if (n_cycle+1)%3==0:
-          dump('jungfrau_pred_%s_%d.pickle'%(ts, n_cycle), fig )
-        print ('Dumped Jungfrau Prediction for %d cycle'%n_cycle)
+
+        stuff_to_dump=[assembled_img, img]
+
+        if show_plotted_images:
+          import pylab as plt
+          plt.clf()
+          fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2)
+          ax1.imshow([[0, 1, 1], [0, 1, 2]])
+          ax2.imshow([[0, 1, 1], [0, 1, 2]])
+          m = assembled_img[assembled_img>1.e-9].mean()
+          s = assembled_img[assembled_img>1.e-9].std()
+          vmin = 1
+          vmax = m+10*s
+          ax1.images[0].set_data(assembled_img)
+          ax1.images[0].set_clim(vmin, vmax)
+          ax2.images[0].set_data(img)
+          ax2.images[0].set_clim(1, 1000)
+          dump(os.path.join(outdir, 'jungfrau_pred_%s_%d.pickle'%(ts, n_cycle)), fig )
+
+        dump(os.path.join(outdir, 'jungfrau_comparison_%s_%d.pickle'%(ts, n_cycle)), stuff_to_dump )
+        #print ('Dumped Jungfrau Prediction for %d cycle'%n_cycle)
         #plt.show()
 
 if __name__ == "__main__":
@@ -509,8 +670,14 @@ if __name__ == "__main__":
     # On my Macbook Pro, here is the path
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
     #ts='20180501114703722' # Image used in blog to compare on jungfrau
-    ts='20180501120317142'
+    #ts='20180501120317142'
+    #ts='20180501113206489'
+    #ts='20180501150340458' # This ts gives slope of 6 and intercept -1200, what is going on ?
+    #ts='20180501124635321' # A good timestamp
+    ts='20180501160604046'
+    outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
+    outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir)
+    run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True)
 
 

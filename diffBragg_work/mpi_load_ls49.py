@@ -125,8 +125,9 @@ class Script(object):
     import time
 
     ts = item_list[0] 
+    print ('Inside do_work for rank %d'%rank)
     t_start = time.time()
-    run_all_refine_ls49(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.rayonix_expt_path, show_plotted_images=False):
+    run_all_refine_ls49(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.rayonix_expt_path, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir)
     t_end = time.time()
     delta_time = t_end - t_start
     print ('DiffBragg_LS49_timing %s  = %d'%(ts,delta_time))
