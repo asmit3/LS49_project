@@ -8,6 +8,8 @@ import sys, os
 
 from LS49_project.diffBragg_work.load_ls49 import strong_spot_mask, process_ls49_image_real, run_all_refine_ls49
 
+from dials.command_line.stills_process import control_phil_str, dials_phil_str, program_defaults_phil_str
+
 help_message = ''' MPI version of load_ls49 script to distribute diffBragg jobs over several cores/nodes using MPI'''
 usage = "usage: libtbx.python script_name params.phil"
 
@@ -31,8 +33,8 @@ LS49_diffBragg_phil_str='''
       .help = Mosaic domain size initial estimate, will be refined eventually
 }
 '''
-phil_scope = parse(LS49_diffBragg_phil_str)
-
+#phil_scope = parse(LS49_diffBragg_phil_str)
+phil_scope = parse(LS49_diffBragg_phil_str+control_phil_str + dials_phil_str, process_includes=True).fetch(parse(program_defaults_phil_str))
 
 def params_from_phil(args):
   user_phil = []
@@ -127,7 +129,7 @@ class Script(object):
     ts = item_list[0] 
     print ('Inside do_work for rank %d'%rank)
     t_start = time.time()
-    run_all_refine_ls49(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.rayonix_expt_path, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir)
+    run_all_refine_ls49(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.rayonix_expt_path, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir, params=self.params)
     t_end = time.time()
     delta_time = t_end - t_start
     print ('DiffBragg_LS49_timing %s  = %d'%(ts,delta_time))

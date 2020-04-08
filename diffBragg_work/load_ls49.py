@@ -3,6 +3,77 @@
 # Copying it from cctbx_project/simtbx/diffBragg to make more local edits here instead of in cctbx
 #
 #
+def process_reference(reference):
+    """Load the reference spots.
+       Code taken from dials.stills_process"""
+    if reference is None:
+        return None, None
+    assert "miller_index" in reference
+    assert "id" in reference
+    mask = reference.get_flags(reference.flags.indexed)
+    rubbish = reference.select(~mask)
+    if mask.count(False) > 0:
+        reference.del_selected(~mask)
+        logger.info(" removing %d unindexed reflections" % mask.count(True))
+    if len(reference) == 0:
+        raise Sorry(
+            """
+    Invalid input for reference reflections.
+    Expected > %d indexed spots, got %d
+  """
+            % (0, len(reference))
+        )
+    mask = reference["miller_index"] == (0, 0, 0)
+    if mask.count(True) > 0:
+        rubbish.extend(reference.select(mask))
+        reference.del_selected(mask)
+        logger.info(" removing %d reflections with hkl (0,0,0)" % mask.count(True))
+    mask = reference["id"] < 0
+    if mask.count(True) > 0:
+        raise Sorry(
+            """
+    Invalid input for reference reflections.
+    %d reference spots have an invalid experiment id
+  """
+            % mask.count(True)
+        )
+    return reference, rubbish
+
+def integrate(experiments, indexed, stills_process_params):
+    """ Code taken from dials.stills_process"""
+    indexed, _ = process_reference(indexed)
+
+    # Get the integrator from the input parameters
+    from dials.algorithms.profile_model.factory import ProfileModelFactory
+    from dials.algorithms.integration.integrator import IntegratorFactory
+    from dials.array_family import flex
+    from dxtbx.model.experiment_list import ExperimentListFactory
+
+    # Compute the profile model
+    # Predict the reflections
+    # Match the predictions with the reference
+    # Create the integrator
+    experiments = ProfileModelFactory.create(stills_process_params, experiments, indexed)
+    predicted = flex.reflection_table.from_predictions_multi(
+        experiments,
+        dmin=stills_process_params.prediction.d_min,
+        dmax=stills_process_params.prediction.d_max,
+        margin=stills_process_params.prediction.margin,
+        force_static=stills_process_params.prediction.force_static,
+    )
+    predicted.match_with_reference(indexed)
+    integrator = IntegratorFactory.create(stills_process_params, experiments, predicted)
+
+    # Integrate the reflections
+    integrated = integrator.integrate()
+    return experiments, integrated
+
+    if False:
+        # Dump experiments to disk
+        experiments.as_file(integrated_experiments_filename)
+        # Save the reflections
+        integrated.as_file(integrated_reflections_filename)
+        # Now 
 
 def strong_spot_mask(refl_tbl, img_size):
     """note only works for strong spot reflection tables
@@ -118,6 +189,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     # end validation stuff
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
     R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_indexed.refl'%tstamp))
+    R2=R2.select(R2['id']==0)
     strong_mask = strong_spot_mask(refl_tbl=R2, img_size=img.shape)
     is_bg_pixel = np.logical_not(strong_mask)
     is_BAD_pixel = np.logical_not(pickle.load(open(os.path.join(ls49_data_dir,'../','mask_r4.pickle'), 'r'))[0].as_numpy_array())
@@ -181,6 +253,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     import os
     import dxtbx
     from libtbx.easy_pickle import dump
+    from outlier_rejection import outlier_rejection_ls49
 
     if outdir is None:
       outdir='.'
@@ -218,7 +291,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
 
     # Define number of macrocycles and strategies
     n_macrocycles=5
-    total_cycles=4*n_macrocycles+1
+    total_cycles=1 #4*n_macrocycles+1
 
     #ncells_strategy =          [True,  False, False,  False, True,  False, False, False,  False, False, False, True,  False,  False, False, True,  False,  False,  False, True]
     #local_spotscale_strategy = [False, False, False,  False, False, False, False, False,  False, False, False, False, False,  False, False, False, False,  False,  False, False]
@@ -455,6 +528,26 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
         ref_predictor(indexed_reflections)
         if n_cycle==total_cycles-1:
           indexed_reflections.as_file(os.path.join(outdir, 'after_refinement_%s_%s.refl'%(ts,n_cycle)))
+          # Also do the integration here for good measure
+          if True:
+            print ('Integrating reflection in diffBragg for timestamp: %s'%ts)
+            integrated_expts, integrated_refls=integrate(dump_explist, indexed_reflections, params)
+            # Compare before and after outlier rejection
+            #integrated_expts.as_file(os.path.join(outdir, 'integrated_b4_outlier_%s_%s.expt'%(ts, n_cycle)))
+            #integrated_refls.as_file(os.path.join(outdir, 'integrated_b4_outlier_%s_%s.refl'%(ts, n_cycle)))
+            integrated_expts, integrated_refls=outlier_rejection_ls49(integrated_expts, integrated_refls,ls49_data_dir=ls49_data_dir, ts=ts, outdir=outdir, dump_output_files=False)
+            #integrated_expts.as_file(os.path.join(outdir, 'integrated_a4_outlier_%s_%s.expt'%(ts, n_cycle)))
+            #integrated_refls.as_file(os.path.join(outdir, 'integrated_a4_outlier_%s_%s.refl'%(ts, n_cycle)))
+            # Also write out integration pickles for cxi.merge
+            from xfel.command_line.frame_extractor import ConstructFrame
+            from libtbx import easy_pickle
+            frame = ConstructFrame(integrated_refls, integrated_expts[0]).make_frame()
+            frame["pixel_size"] = integrated_expts[0].detector[0].get_pixel_size()[0]
+            fname='int-a4-outlier-'+str(n_cycle)+'-0-'+ts+'.pickle'
+            outfile=os.path.join(outdir, fname)
+            easy_pickle.dump(outfile, frame)
+            print ('All integration files written out for timestamp: %s'%ts)
+            #from IPython import embed; embed(); exit()
       C=C2 # For next round
 
 ###################################################################################
@@ -631,6 +724,59 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
         #plt.show()
 
 if __name__ == "__main__":
+    from dials.command_line.stills_process import phil_scope as stills_process_phil_scope
+    from libtbx.phil import parse
+    import os, sys
+    ''' Example phil file
+
+        output {
+          experiments_filename = None
+          strong_filename = None
+        }
+        spotfinder {
+          filter {
+            min_spot_size = 2
+            d_min = 2
+          }
+          threshold {
+            dispersion {
+              gain = 0.46
+              global_threshold = 50
+            }
+          }
+        }
+        indexing {
+          known_symmetry {
+            space_group = P 1 21 1
+            unit_cell = 63.6,28.8,35.6,90,106.5,90
+          }
+          refinement_protocol {
+            d_min_start = 2
+          }
+        }
+        indexing.basis_vector_combinations.max_refine=1
+        indexing.stills.candidate_outlier_rejection=False
+        indexing.index_assignment.simple.hkl_tolerance=0.30
+        profile.gaussian_rs.centroid_definition=com
+        spotfinder.threshold.algorithm=dispersion
+        spotfinder.lookup.mask='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/input/mask_r4.pickle'
+        integration.lookup.mask='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/input/mask_r4.pickle'
+        integration.summation.detector_gain=0.46
+        integration.debug.output=True
+        integration.debug.separate_files=False'''
+
+    args = sys.argv[1:]
+    user_phil = []
+    for arg in args:
+      if os.path.isfile(arg):
+        user_phil.append(parse(file_name=arg))
+      else:
+        try:
+          user_phil.append(parse(arg))
+        except Exception as e:
+          raise Sorry("Unrecognized argument: %s"%arg)
+    stills_process_params = stills_process_phil_scope.fetch(sources=user_phil).extract()
+
     # Initial r0222 regression
     timestamps_of_interest = ['20180501143533988', # bad
                               '20180501143546717', # bad --> blows up
@@ -704,10 +850,10 @@ if __name__ == "__main__":
         '20180501172245303',
         '20180501172249904']
 
-    ts=a4[6]
+    ts='20180501155736647'
     #outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True)
+    run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=False, params=stills_process_params)
 
 
