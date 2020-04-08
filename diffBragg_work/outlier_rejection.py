@@ -40,6 +40,24 @@ def process_ls49_image_real2(experiments,
     refls=reflections
     # Always choose the 0th lattice for now
     refls=refls.select(refls['id']==0)
+    # Also reject multiple lattice spots at this stage 
+    if True:
+      print ('Rejecting multiple lattices')
+      keep_refls = flex.bool(len(refls), True)
+      strong_refls=flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_strong.refl'%tstamp))
+      for ii, refl in enumerate(refls.rows()):
+        lattice_count=0
+        for strong_refl in strong_refls.rows():
+          x1,x2,y1,y2,z1,z2=refl['bbox']
+          x,y,z=strong_refl['xyzobs.px.value']
+          if x > x1 and x < x2 and y > y1 and y < y2:
+            lattice_count +=1
+        if lattice_count >1:
+          print ('Multiple Lattice spotted here:',refl['xyzobs.px.value'], ii)
+          keep_refls[ii]=False
+      #from IPython import embed; embed(); exit() 
+      print ('Retained %d spots during multiple lattice filtering out of %d'%(keep_refls.count(True), len(refls)))
+      refls=refls.select(keep_refls)
     # remove the shoeboxes in the mask region
     if True:
       mask_file = os.path.join(ls49_data_dir,'../','mask_r4.pickle')
@@ -59,6 +77,7 @@ def process_ls49_image_real2(experiments,
           #from IPython import embed; embed(); exit()
           delete_refl_bool[ii]=True
           print ('Deleting reflection # %d because of mask overlap'%ii) 
+      print ('Retained %d spots after mask filtering out of %d'%(delete_refl_bool.count(False), len(refls)))
       
       refls.del_selected(delete_refl_bool)
 
@@ -269,8 +288,8 @@ def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None,
     outfile=os.path.join(outdir, fname)
     if dump_output_files:
       easy_pickle.dump(outfile, frame)
-      filtered_expts.as_file('idx-filtered_%s.expt'%ts)
-      filtered_refls.as_file('idx-filtered_%s.refl'%ts)
+      #filtered_expts.as_file('idx-filtered_%s.expt'%ts)
+      #filtered_refls.as_file('idx-filtered_%s.refl'%ts)
 
     return filtered_expts, filtered_refls
 
@@ -311,7 +330,8 @@ if __name__ == "__main__":
     ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
     # On my Macbook Pro, here is the path
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
-    ts='20180501114703722' # Image used in blog to compare on jungfrau
+    #ts='20180501114703722' # Image used in blog to compare on jungfrau
+    ts='20180501172454264'
     experiments_path=os.path.join(ls49_data_dir,'idx-%s_integrated.expt'%ts)
     reflections_path=os.path.join(ls49_data_dir,'idx-%s_integrated.refl'%ts)
     experiments=ExperimentListFactory.from_json_file(experiments_path, check_format=False)[0:1]
@@ -325,6 +345,6 @@ if __name__ == "__main__":
       if LS49_regression is None:
         raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
       ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_r0222_cori', 'rayonix_expt')
-    outlier_rejection_ls49(experiments, reflections,ls49_data_dir=ls49_data_dir, ts=ts, show_plotted_images=True)
+    outlier_rejection_ls49(experiments, reflections,ls49_data_dir=ls49_data_dir, ts=ts, show_plotted_images=False)
 
 

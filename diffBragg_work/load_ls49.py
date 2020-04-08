@@ -31,7 +31,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
                             mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             outlier_with_diffBragg=True,
-                            ls49_data_dir=None):
+                            ls49_data_dir=None,
+                            outdir=None):
     import os, pickle, numpy as np
     from scipy.interpolate import interp1d
     import dxtbx
@@ -42,6 +43,9 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     import libtbx.load_env
     from dials.util import Sorry
     from outlier_rejection import outlier_rejection_ls49
+
+    if outdir is None:
+      outdir='.'
 
     if ls49_data_dir is None:
       LS49_regression = libtbx.env.find_in_repositories(
@@ -61,30 +65,13 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     refls=refls.select(refls['id']==0)
     # Filter reflections if necessary depending on predictions from diffBragg ?
     if outlier_with_diffBragg:
-      exp_list, refls=outlier_rejection_ls49(exp_list, refls,ls49_data_dir=ls49_data_dir, ts=tstamp)
-
-    # Also reject multiple lattice spots at this stage 
-    if True:
-      print ('Rejecting multiple lattices')
-      keep_refls = flex.bool(len(refls), True)
-      strong_refls=flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_strong.refl'%tstamp))
-      for ii, refl in enumerate(refls.rows()):
-        lattice_count=0
-        for strong_refl in strong_refls.rows():
-          x1,x2,y1,y2,z1,z2=refl['bbox']
-          x,y,z=strong_refl['xyzobs.px.value']
-          if x > x1 and x < x2 and y > y1 and y < y2:
-            lattice_count +=1
-        if lattice_count >1:
-          print ('Multiple Lattice spotted here:',refl['xyzobs.px.value'], ii)
-          keep_refls[ii]=False
-      #from IPython import embed; embed(); exit() 
-      refls=refls.select(keep_refls)
+      exp_list, refls=outlier_rejection_ls49(exp_list, refls,ls49_data_dir=ls49_data_dir, ts=tstamp, outdir=outdir, dump_output_files=False)
 
     exp = exp_list[0]
     C = exp.crystal
     B = exp.beam
     D = exp.detector
+
     #refls = flex.reflection_table.from_file('idx-%s_indexed.refl' % tstamp)
     Nbefore = len(refls)
     # Keep validation reflections here using inverse logic of refls selection
@@ -199,7 +186,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       outdir='.'
 
     print ('Inside run_all_refine_ls49: Starting processing')
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=4.0, ls49_data_dir=ls49_data_dir)
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=4.0, ls49_data_dir=ls49_data_dir, outdir=outdir)
     refine_with_psf=True
     plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
@@ -223,6 +210,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     n_mos_domains=1
     a,b,c,_,_,_ = C.get_unit_cell().parameters()
     Deff = 1000
+    C.set_domain_size_ang(Deff)
+    C.set_half_mosaicity_deg(mos_spread_deg) 
     Ncells_abc_0 = np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
     n_spots = len(data['tilt_abc'])
     init_local_spotscale = flex.double([1.0]*n_spots)
