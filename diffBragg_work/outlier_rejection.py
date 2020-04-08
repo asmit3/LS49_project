@@ -23,7 +23,7 @@ def process_ls49_image_real2(experiments,
     import libtbx.load_env
     from dials.util import Sorry
 
-    GAIN = 0.75
+    GAIN = 1.0
 
     cbf_path=os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)
     loader = dxtbx.load(cbf_path)
@@ -40,6 +40,29 @@ def process_ls49_image_real2(experiments,
     refls=reflections
     # Always choose the 0th lattice for now
     refls=refls.select(refls['id']==0)
+    # remove the shoeboxes in the mask region
+    if True:
+      mask_file = os.path.join(ls49_data_dir,'../','mask_r4.pickle')
+      from libtbx.easy_pickle import load
+      mask=load(mask_file)[0].as_numpy_array()
+      delete_refl_bool=flex.bool(len(refls), False)
+      for ii, refl in enumerate(refls.rows()):
+        x1,x2,y1,y2=refl['shoebox'].bbox[:4]
+        # Make sure edge cases are handled here
+        if x1 < 0: x1=0
+        if y1 < 0: y1=0
+        if x2 > mask.shape[0]: x2=mask.shape[0]
+        if y2 > mask.shape[1]: y2=mask.shape[1]
+        mask_size = mask[x1:x2, y1:y2].shape[0]*mask[x1:x2, y1:y2].shape[1]
+        non_masked_shoebox_size=mask[x1:x2, y1:y2].sum()
+        if mask_size-non_masked_shoebox_size != 0:
+          #from IPython import embed; embed(); exit()
+          delete_refl_bool[ii]=True
+          print ('Deleting reflection # %d because of mask overlap'%ii) 
+      
+      refls.del_selected(delete_refl_bool)
+
+
     bboxes = [list(refls['shoebox'][i].bbox)[:4] for i in range(len(refls)) ]
     resolutions = [D[0].get_resolution_at_pixel(B.get_s0(), refls[i]['xyzobs.px.value'][0:2]) for i in range(len(refls))]
     bboxes = np.array(bboxes)
@@ -161,6 +184,13 @@ def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None,
       bbox=data['bboxes_x1x2y1y2'][i_spot]
       a,b,c=data['tilt_abc'][i_spot]
       x1,x2,y1,y2=bbox
+
+      nx_lim, ny_lim = data['data_img'].shape
+      if x1 < 0: x1=0
+      if y1 < 0: y1=0
+      if x2 >=nx_lim: x2=nx_lim-1
+      if y2 >=ny_lim: y2=ny_lim-1
+
       yr, xr = np.indices((y2-y1+1, x2-x1+1))
       tilt_plane=xr*a+yr*b+c
 
@@ -170,6 +200,7 @@ def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None,
       img=img[y1:y2+1, x1:x2+1]
       #img=tilt_plane+scale*img
       data_img=data['data_img'][y1:y2+1, x1:x2+1]-tilt_plane
+        #continue
       #data_img[data_img<0]=0
 
       if show_plotted_images:
@@ -219,6 +250,7 @@ def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None,
         fig.canvas.draw()
         plt.pause(2)
     #plt.show()
+    print ('At the end of outlier rejection, keeping %d reflections out of %d'%(keep_refl_bool.count(True), len(keep_refl_bool) ))
     filtered_refls=data['integ_refl'].select(keep_refl_bool)
     # Assuming only one expt in expt list when dumping
     filtered_expt = Experiment(imageset=data['cbf_imageset'],

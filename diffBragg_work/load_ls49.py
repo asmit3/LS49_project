@@ -80,7 +80,6 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
           keep_refls[ii]=False
       #from IPython import embed; embed(); exit() 
       refls=refls.select(keep_refls)
-     
 
     exp = exp_list[0]
     C = exp.crystal
@@ -115,7 +114,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
 
 
     # Special case please remove
-    refls_validation=refls
+    #refls_validation=refls
 
     bboxes = [list(refls['shoebox'][i].bbox)[:4] for i in range(len(refls)) ]
     resolutions = [D[0].get_resolution_at_pixel(B.get_s0(), refls[i]['xyzobs.px.value'][0:2]) for i in range(len(refls))]
@@ -200,7 +199,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       outdir='.'
 
     print ('Inside run_all_refine_ls49: Starting processing')
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=5, resmin=2.3, resmax=3.5, ls49_data_dir=ls49_data_dir)
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=4.0, ls49_data_dir=ls49_data_dir)
     refine_with_psf=True
     plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
@@ -229,7 +228,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     init_local_spotscale = flex.double([1.0]*n_spots)
 
     # Define number of macrocycles and strategies
-    n_macrocycles=1
+    n_macrocycles=5
     total_cycles=4*n_macrocycles+1
 
     #ncells_strategy =          [True,  False, False,  False, True,  False, False, False,  False, False, False, True,  False,  False, False, True,  False,  False,  False, True]
@@ -244,8 +243,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     crystal_scale_strategy =   [False, False, False, False]*n_macrocycles+  [False]
 
     background_strategy =      [False, False, False, True]*n_macrocycles+  [True]
-    umat_strategy =            [False, True, False, False]*n_macrocycles + [True]
-    bmat_strategy =            [False, False, True, False]*n_macrocycles + [True]
+    umat_strategy =            [False, True,  False, False]*n_macrocycles + [True]
+    bmat_strategy =            [False, False, True,  False]*n_macrocycles + [True]
     
 
     for n_cycle in range(total_cycles):
@@ -471,7 +470,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
 
 ###################################################################################
 #  Rayonix validation: Predict on all shoeboxes in rayonix and then calculate statistics
-      if True:
+      if False:
         refls_validation=data['refls_validation']
 
         nbcryst_validate_ray = nanoBragg_crystal.nanoBragg_crystal()
@@ -495,7 +494,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
         #SIM_jung.D.spot_scale = 1e6 # to guide your eye
         scale=refined_scale
         n_spots_validation = len(data['tilt_abc_validation'])
-        show_validation_images=True
+        show_validation_images=False
         if show_validation_images:
           import pylab as plt
           plt.clf()
@@ -509,6 +508,11 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
           bbox=data['bboxes_validation'][i_spot]
           a,b,c=data['tilt_abc_validation'][i_spot]
           x1,x2,y1,y2=bbox
+          nx_lim, ny_lim = data['data_img'].shape
+          if x1 < 0: x1=0
+          if y1 < 0: y1=0
+          if x2 >=nx_lim: x2=nx_lim-1
+          if y2 >=ny_lim: y2=ny_lim-1
           yr, xr = np.indices((y2-y1+1, x2-x1+1))
           tilt_plane=xr*a+yr*b+c
           SIM_validate_ray.D.region_of_interest=((bbox[0], bbox[1]), (bbox[2], bbox[3]))
@@ -674,8 +678,45 @@ if __name__ == "__main__":
     #ts='20180501113206489'
     #ts='20180501150340458' # This ts gives slope of 6 and intercept -1200, what is going on ?
     #ts='20180501124635321' # A good timestamp
-    ts='20180501160604046'
-    outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
+    b4=['20180501123230044',
+        '20180501125551833',
+        '20180501131709048',
+        '20180501135342737',
+        '20180501140101707',
+        '20180501140314529',  # fails now at lbfgs bmat
+        '20180501145828770',
+        '20180501151335956',
+        '20180501151350292',  # bad image
+        '20180501151750597',
+        '20180501152138329',
+        '20180501170101889']
+
+    a4=['20180501113257012', # cant rotate rotX at end of cycle 5
+        '20180501115304731', # No high res reflection left
+        '20180501120831125', # cant rotate rotX
+        '20180501120921553', # No high res reflection left
+        '20180501123424609', # rotX rotation
+        '20180501123614673', # fails at umat not sure why ?
+        '20180501123645987', # shoebox at beamcenter not masked out ?
+        '20180501124635321', # bmat fails
+        '20180501135434154', # bmat fails but only one spot selected tbh
+        '20180501140832594', # blows up again because of bmat
+        '20180501145523294', # again bmat issues
+        '20180501150036815', # not enough high res refls
+        '20180501151239587', # rotX not possible here
+        '20180501151431167', # rotX short
+        '20180501152123262', # not enough high res refls
+        '20180501152256010', # not enough high res refls
+        '20180501152716673', # bmat blows up
+        '20180501152952655', # bmat lbfgs issues
+        '20180501160510853',
+        '20180501164559489',
+        '20180501172017128',
+        '20180501172245303',
+        '20180501172249904']
+
+    ts=a4[6]
+    #outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     outdir=None
     #ls49_data_dir=None
     run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True)
