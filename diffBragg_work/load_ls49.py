@@ -219,8 +219,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max(max_energy - 15, min(chann_lambda))
-    max_energy_interpol = min(max_energy + 15, max(chann_lambda))
+    min_energy_interpol = max(max_energy - 35, min(chann_lambda))
+    max_energy_interpol = min(max_energy + 35, max(chann_lambda))
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
@@ -259,7 +259,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       outdir='.'
 
     print ('Inside run_all_refine_ls49: Starting processing')
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.3, resmax=4.0, ls49_data_dir=ls49_data_dir, outdir=outdir)
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=7, resmin=2.3, resmax=5.0, ls49_data_dir=ls49_data_dir, outdir=outdir)
     refine_with_psf=True
     plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
@@ -290,8 +290,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     init_local_spotscale = flex.double([1.0]*n_spots)
 
     # Define number of macrocycles and strategies
-    n_macrocycles=5
-    total_cycles=1 #4*n_macrocycles+1
+    n_macrocycles=1
+    total_cycles=4*n_macrocycles+2
 
     #ncells_strategy =          [True,  False, False,  False, True,  False, False, False,  False, False, False, True,  False,  False, False, True,  False,  False,  False, True]
     #local_spotscale_strategy = [False, False, False,  False, False, False, False, False,  False, False, False, False, False,  False, False, False, False,  False,  False, False]
@@ -300,13 +300,13 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     #background_strategy =      [False, False,  False, True,  False,  False, False, True,  False, False, True,  False, False,  False, True,  False,  False, False,  True,  True]
     #umat_strategy =            [False, True,   False, False, False,  True,  False, False, True,  False, False, False, True,   False, False, False,  True,  False,  False, True] 
     #bmat_strategy =            [False, False,  True,  False, False,  False, True,  False, False, True,  False, False, False,  True,  False, False,  False, True,   False, True] 
-    ncells_strategy =          [True, False, False, False]*n_macrocycles+  [True]
-    local_spotscale_strategy = [True, False, False, False]*n_macrocycles+ [True]
-    crystal_scale_strategy =   [False, False, False, False]*n_macrocycles+  [False]
+    ncells_strategy =           [True, False, False, False]*n_macrocycles  + [True, False]
+    local_spotscale_strategy =  [False, False, False, False]*n_macrocycles  + [False, True]
+    crystal_scale_strategy =    [True, False, False, False]*n_macrocycles + [True, False]
 
-    background_strategy =      [False, False, False, True]*n_macrocycles+  [True]
-    umat_strategy =            [False, True,  False, False]*n_macrocycles + [True]
-    bmat_strategy =            [False, False, True,  False]*n_macrocycles + [True]
+    background_strategy =       [False, False, False, True]*n_macrocycles +  [True, False]
+    umat_strategy =             [False, True,  False, False]*n_macrocycles + [True, False]
+    bmat_strategy =             [False, False, True,  False]*n_macrocycles + [True, False]
     
 
     for n_cycle in range(total_cycles):
@@ -369,6 +369,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       RUC.refine_background_planes = background_strategy[n_cycle]
       RUC.refine_Umatrix = umat_strategy[n_cycle]
       RUC.refine_Bmatrix = bmat_strategy[n_cycle]
+      #RUC.refine_detdist = detdist_strategy[n_cycle]
 
       RUC.run()
 
@@ -495,8 +496,11 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
 
       C2 = deepcopy(C)
       if RUC.refine_Umatrix:
-        ang, ax = RUC.get_correction_misset(as_axis_angle_deg=True)
-        C2.rotate_around_origin(ax, ang)
+        try:
+          ang, ax = RUC.get_correction_misset(as_axis_angle_deg=True)
+          C2.rotate_around_origin(ax, ang)
+        except Exception as e:
+          print ('RUC Rotation not possible:',str(e))
       C2.set_B(RUC.get_refined_Bmatrix())
       
 
@@ -805,55 +809,15 @@ if __name__ == "__main__":
     #ts = timestamps_of_interest[-2]
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
     # On cori here is the path
-    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
     # On my Macbook Pro, here is the path
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
-    #ts='20180501114703722' # Image used in blog to compare on jungfrau
+    ts='20180501114703722' # Image used in blog to compare on jungfrau
     #ts='20180501120317142'
     #ts='20180501113206489'
-    #ts='20180501150340458' # This ts gives slope of 6 and intercept -1200, what is going on ?
-    #ts='20180501124635321' # A good timestamp
-    b4=['20180501123230044',
-        '20180501125551833',
-        '20180501131709048',
-        '20180501135342737',
-        '20180501140101707',
-        '20180501140314529',  # fails now at lbfgs bmat
-        '20180501145828770',
-        '20180501151335956',
-        '20180501151350292',  # bad image
-        '20180501151750597',
-        '20180501152138329',
-        '20180501170101889']
-
-    a4=['20180501113257012', # cant rotate rotX at end of cycle 5
-        '20180501115304731', # No high res reflection left
-        '20180501120831125', # cant rotate rotX
-        '20180501120921553', # No high res reflection left
-        '20180501123424609', # rotX rotation
-        '20180501123614673', # fails at umat not sure why ?
-        '20180501123645987', # shoebox at beamcenter not masked out ?
-        '20180501124635321', # bmat fails
-        '20180501135434154', # bmat fails but only one spot selected tbh
-        '20180501140832594', # blows up again because of bmat
-        '20180501145523294', # again bmat issues
-        '20180501150036815', # not enough high res refls
-        '20180501151239587', # rotX not possible here
-        '20180501151431167', # rotX short
-        '20180501152123262', # not enough high res refls
-        '20180501152256010', # not enough high res refls
-        '20180501152716673', # bmat blows up
-        '20180501152952655', # bmat lbfgs issues
-        '20180501160510853',
-        '20180501164559489',
-        '20180501172017128',
-        '20180501172245303',
-        '20180501172249904']
-
-    ts='20180501155736647'
     #outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
+    #ts='20180501114755146'
     outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=False, params=stills_process_params)
-
-
+    run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=stills_process_params)
