@@ -100,7 +100,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                             resmax=12.0, resmin=3.0,
                             #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
+                            mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
+                            #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             outlier_with_diffBragg=True,
                             ls49_data_dir=None,
                             outdir=None):
@@ -126,7 +127,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         raise Sorry('LS49_regression folder needs to be present or else specify ls49_data_dir')
       ls49_data_dir = os.path.join(LS49_regression, 'diffBragg_work', 'iota_r0222_cori', 'rayonix_expt')
 
-    GAIN = 1.0
+    GAIN = 0.75
     loader = dxtbx.load(os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp))
     cbf_imageset = loader.get_imageset([os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)])
     
@@ -259,7 +260,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       outdir='.'
 
     print ('Inside run_all_refine_ls49: Starting processing')
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=7, resmin=2.3, resmax=5.0, ls49_data_dir=ls49_data_dir, outdir=outdir)
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=4, resmin=2.1, resmax=4.5, ls49_data_dir=ls49_data_dir, outdir=outdir)
     refine_with_psf=True
     plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
@@ -290,8 +291,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     init_local_spotscale = flex.double([1.0]*n_spots)
 
     # Define number of macrocycles and strategies
-    n_macrocycles=1
-    total_cycles=4*n_macrocycles+2
+    n_macrocycles=4
+    total_cycles=4*n_macrocycles
 
     #ncells_strategy =          [True,  False, False,  False, True,  False, False, False,  False, False, False, True,  False,  False, False, True,  False,  False,  False, True]
     #local_spotscale_strategy = [False, False, False,  False, False, False, False, False,  False, False, False, False, False,  False, False, False, False,  False,  False, False]
@@ -300,13 +301,13 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     #background_strategy =      [False, False,  False, True,  False,  False, False, True,  False, False, True,  False, False,  False, True,  False,  False, False,  True,  True]
     #umat_strategy =            [False, True,   False, False, False,  True,  False, False, True,  False, False, False, True,   False, False, False,  True,  False,  False, True] 
     #bmat_strategy =            [False, False,  True,  False, False,  False, True,  False, False, True,  False, False, False,  True,  False, False,  False, True,   False, True] 
-    ncells_strategy =           [True, False, False, False]*n_macrocycles  + [True, False]
-    local_spotscale_strategy =  [False, False, False, False]*n_macrocycles  + [False, True]
-    crystal_scale_strategy =    [True, False, False, False]*n_macrocycles + [True, False]
+    ncells_strategy =           [True,  False,  False,   False ]*n_macrocycles  + [True,]
+    local_spotscale_strategy =  [False, False,  False,   False ]*n_macrocycles  + [False,]
+    crystal_scale_strategy =    [True,  False,  False,   False ]*n_macrocycles + [True,]
 
-    background_strategy =       [False, False, False, True]*n_macrocycles +  [True, False]
-    umat_strategy =             [False, True,  False, False]*n_macrocycles + [True, False]
-    bmat_strategy =             [False, False, True,  False]*n_macrocycles + [True, False]
+    background_strategy =       [False, False,  False,   True]*n_macrocycles +  [True,]
+    umat_strategy =             [False, True,   False,   False]*n_macrocycles + [True,]
+    bmat_strategy =             [False, False,  True,    False]*n_macrocycles + [True,]
     
 
     for n_cycle in range(total_cycles):
@@ -317,6 +318,41 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
         refined_gain = 1.0
         refined_local_spotscale = init_local_spotscale 
         refined_tilt_abc=data['tilt_abc']
+
+      n_refls_to_refine= len(data['bboxes_x1x2y1y2'])
+      total_refls_considered= len(data['bboxes_x1x2y1y2'])
+      na=0
+      nb=n_refls_to_refine-1
+  
+      # Special case here:
+      # If refining umat, then only refine top few reflections
+      # Hoping these will be the high resolution ones
+      is_special_umat_refine=False
+      #if umat_strategy[n_cycle]\
+      #   and not background_strategy[n_cycle]\
+      #   and not local_spotscale_strategy[n_cycle]\
+      #   and (n_cycle) % 4 == 2:
+      #  is_special_umat_refine=True
+
+      #if is_special_umat_refine:
+      #  n_refls_to_refine=5
+      #  na=0
+      #  nb=n_refls_to_refine-1
+      #  print ('Resolution range of Umat Refinement: %.2f - %.2f'%(data['resolution'][na], data['resolution'][nb]))
+
+      is_special_ncells_scale_refine=False
+      #if ncells_strategy[n_cycle]\
+      #   and crystal_scale_strategy[n_cycle]\
+      #   and not background_strategy[n_cycle]\
+      #   and not local_spotscale_strategy[n_cycle]\
+      #   and (n_cycle) % 4 == 1:
+      #  is_special_ncells_scale_refine=True
+      #if is_special_ncells_scale_refine:
+      #  n_refls_to_refine=5
+      #  na=total_refls_considered-n_refls_to_refine-1
+      #  nb=total_refls_considered-1
+      #  print ('Resolution range of Ncells+Scale Refinement: %.2f - %.2f'%(data['resolution'][-n_refls_to_refine], data['resolution'][-1]))
+
 
       Ncells_abc=refined_ncells # Setting it here for cycles not equal to 0
       # Set up nbcryst and nbbeam
@@ -346,9 +382,9 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       UcellMan = MonoclinicManager(a=ucell[0], b=ucell[1], c=ucell[2], beta=ucell[4]*np.pi / 180.)
 
       RUC = RefineAll(
-          spot_rois=data["bboxes_x1x2y1y2"],
-          spot_resolution=data['resolution'],
-          abc_init=refined_tilt_abc,
+          spot_rois=data["bboxes_x1x2y1y2"][na:nb],
+          spot_resolution=data['resolution'][na:nb],
+          abc_init=refined_tilt_abc[na:nb, :],
           img=data["data_img"],
           SimData_instance=SIM,
           plot_images=plot_images,
@@ -356,7 +392,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
           ucell_manager=UcellMan,
           init_gain=refined_gain,
           init_scale=refined_scale,
-          init_local_spotscale=refined_local_spotscale)
+          init_local_spotscale=refined_local_spotscale[na:nb])
 
       RUC.trad_conv_eps = 1e-5
       RUC.use_curvatures=False #
@@ -378,11 +414,12 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       refined_ncells = RUC.x[-4]
       refined_scale = RUC.x[-1]
       refined_gain = RUC.x[-2]
-      refined_local_spotscale = RUC.x[RUC.n_bg:RUC.n_bg+RUC.n_spots]
-      refined_tilt_abc=[]
-      for i in range(RUC.n_spots):
-        refined_tilt_abc.append([RUC.x[i], RUC.x[RUC.n_spots+i], RUC.x[2*RUC.n_spots+i]])
-      refined_tilt_abc=np.array(refined_tilt_abc)
+      if not is_special_umat_refine and not is_special_ncells_scale_refine:
+        refined_local_spotscale = RUC.x[RUC.n_bg:RUC.n_bg+RUC.n_spots]
+        refined_tilt_abc=[]
+        for i in range(RUC.n_spots):
+          refined_tilt_abc.append([RUC.x[i], RUC.x[RUC.n_spots+i], RUC.x[2*RUC.n_spots+i]])
+        refined_tilt_abc=np.array(refined_tilt_abc)
 
       # Refinement analysis: use a linear correlation and linear regression model ?
       if True:
@@ -510,6 +547,10 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       print("ground truth unit cell: %2.7g,%2.7g,%2.7g,%2.7g,%2.7g,%2.7g" % ucell)
       print("refined unit cell: %2.7g,%2.7g,%2.7g,%2.7g,%2.7g,%2.7g" % ucell_ref)
       print("")
+
+      ### DANGER POINT ##
+      ### Memory related ###
+      SIM.D.free_all()
 
       C.show()
       C2.show()
@@ -809,15 +850,15 @@ if __name__ == "__main__":
     #ts = timestamps_of_interest[-2]
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
     # On cori here is the path
-    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
-    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
     # On my Macbook Pro, here is the path
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
-    ts='20180501114703722' # Image used in blog to compare on jungfrau
+    #ts='20180501114703722' # Image used in blog to compare on jungfrau
     #ts='20180501120317142'
-    #ts='20180501113206489'
-    #outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
+    ts='20180501163914779' # weird , low rotation change but blows up in prediction ?? !!
+    outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #ts='20180501114755146'
-    outdir=None
+    #outdir=None
     #ls49_data_dir=None
     run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=stills_process_params)

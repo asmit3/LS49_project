@@ -12,7 +12,8 @@ def process_ls49_image_real2(experiments,
                             tstamp,
                             #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz'):
+                            mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz'):
+                            #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz'):
     import os, pickle, numpy as np
     from scipy.interpolate import interp1d
     import dxtbx
@@ -23,7 +24,7 @@ def process_ls49_image_real2(experiments,
     import libtbx.load_env
     from dials.util import Sorry
 
-    GAIN = 1.0
+    GAIN = 0.75
 
     cbf_path=os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)
     loader = dxtbx.load(cbf_path)
@@ -290,7 +291,8 @@ def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None,
       easy_pickle.dump(outfile, frame)
       #filtered_expts.as_file('idx-filtered_%s.expt'%ts)
       #filtered_refls.as_file('idx-filtered_%s.refl'%ts)
-
+   
+    SIM.D.free_all() 
     return filtered_expts, filtered_refls
 
 if __name__ == "__main__":
