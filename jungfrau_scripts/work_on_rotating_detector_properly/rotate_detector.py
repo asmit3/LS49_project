@@ -19,7 +19,7 @@ slow = col(h.get_slow_axis())
 origin = col(h.get_origin())
 
 normal = col(h.get_normal())
-rotation = normal.axis_and_angle_as_r3_rotation_matrix(90, deg=True)
+rotation = normal.axis_and_angle_as_r3_rotation_matrix(-90, deg=True)
 
 h.set_frame(rotation * fast, rotation * slow, rotation * origin)
 
