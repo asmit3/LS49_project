@@ -245,10 +245,10 @@ def outlier_rejection_ls49(experiments, reflections,ls49_data_dir=None, ts=None,
       print ('Summed Intensities: Model: %d     Data=%d   Res = %.2f '%(summed_I_model, summed_I_data, data['resolution'][i_spot]))
 
 
-      if summed_I_model < 20:
-        meets_criterion_for_keeping_refl=False
-      if summed_I_data < 0 and summed_I_model > 1000:
-        meets_criterion_for_keeping_refl=False
+      #if summed_I_model < 20:
+      #  meets_criterion_for_keeping_refl=False
+      #if summed_I_data < 0 and summed_I_model > 1000:
+      #  meets_criterion_for_keeping_refl=False
 
       #if has_multiple_spots_in_shoebox():
       #  meets_criterion_for_keeping_refl=False

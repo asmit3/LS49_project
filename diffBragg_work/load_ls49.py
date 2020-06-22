@@ -100,7 +100,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                             resmax=12.0, resmin=3.0,
                             #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
+                            mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_fromsampleresid_m008_s0_mark0.mtz',
+                            #mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             outlier_with_diffBragg=True,
                             ls49_data_dir=None,
@@ -260,7 +261,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       outdir='.'
 
     print ('Inside run_all_refine_ls49: Starting processing')
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=4, resmin=2.1, resmax=4.5, ls49_data_dir=ls49_data_dir, outdir=outdir)
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=7, resmin=2.1, resmax=5.0, ls49_data_dir=ls49_data_dir, outdir=outdir)
     refine_with_psf=True
     plot_images=True # This is a lie. Mostly need this to store model_Lambda for statistics etc
 
@@ -291,7 +292,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     init_local_spotscale = flex.double([1.0]*n_spots)
 
     # Define number of macrocycles and strategies
-    n_macrocycles=4
+    n_macrocycles=5
     total_cycles=4*n_macrocycles
 
     #ncells_strategy =          [True,  False, False,  False, True,  False, False, False,  False, False, False, True,  False,  False, False, True,  False,  False,  False, True]
@@ -767,6 +768,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
         dump(os.path.join(outdir, 'jungfrau_comparison_%s_%d.pickle'%(ts, n_cycle)), stuff_to_dump )
         #print ('Dumped Jungfrau Prediction for %d cycle'%n_cycle)
         #plt.show()
+    # DANGER return here
+    return
 
 if __name__ == "__main__":
     from dials.command_line.stills_process import phil_scope as stills_process_phil_scope
@@ -848,15 +851,15 @@ if __name__ == "__main__":
                               '20180501143701853'] # Does not work
 
     #ts = timestamps_of_interest[-2]
-    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
     # On cori here is the path
-    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
+    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
     # On my Macbook Pro, here is the path
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
-    #ts='20180501114703722' # Image used in blog to compare on jungfrau
+    ts='20180501114703722' # Image used in blog to compare on jungfrau
     #ts='20180501120317142'
-    ts='20180501163914779' # weird , low rotation change but blows up in prediction ?? !!
+    #ts='20180501163914779' # weird , low rotation change but blows up in prediction ?? !!
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #ts='20180501114755146'
     #outdir=None
