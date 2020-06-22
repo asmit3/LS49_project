@@ -40,9 +40,9 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
                             #mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
                             pdb_file='Refine47_withFE.pdb',
-                            ev_offset=0.0,
+                            seed=0.0,
                             ls49_data_dir=None):
-    import os, pickle, numpy as np
+    import os, pickle, sys, numpy as np
     from scipy.interpolate import interp1d
     import dxtbx
     from dxtbx.model.experiment_list import ExperimentListFactory
@@ -151,7 +151,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     bboxes[bboxes > 256] = 255
     bboxes[bboxes < 0] = 0
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
-    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v1/no_duplicate_millers/select_best_jf_refined/jf_refined_%s.refl'%tstamp))
+    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v2/no_duplicate_millers/select_best_jf_refined/jf_refined_%s.refl'%tstamp))
     #R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v3/jungfrau_indexed_only_%s.refl'%tstamp))
     n_panels=16
     strong_mask = strong_spot_mask(refls=R2, panel_size=img[0].shape, n_panels=n_panels)
@@ -207,45 +207,117 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     from cctbx.eltbx import henke
     import numpy as np
 
-    use_henke=True 
-    # Key here
-    # ev_offset >=0: use_henke=True
-    # ev_offset == -2, use Fe+2 table i.e reduced
-    # ev_offset == -3, use Fe+3 table, i.e oxidized
+    from libtbx.easy_pickle import load
+
+    # Special cases of seed
+    # -1 --> Fe0 from Fe.dat table in data
+    # -2 --> Fe2
+    # -3 --> Fe3
+    # -20 --> Fe0 translated 20 ev
+    # -10 --> Fe3 translated 10 ev
+
+    # All positive numbers > 3 are random seeds used to generate monte carlo trial curves
+
+    if seed == -3:
+      energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
+    if seed == -2:
+      energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/reduced_Fe.pickle'))
+    if seed == -1:
+      energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
 
 
-    if ev_offset < 0: 
-      use_henke = False
+    # Create mcmc random curves if seed > 3
+    # Reserved numbers
+    # 0 --> neutral Fe, no fp/fdp added
+    # 1 --> Use fp/fdp discretized curve from Fe.dat neutral
+    # 3 --> use fp/fdp discretized curve from Fe3 sherrell data 
+    sherrell_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_setup_before_scattering_factor/scattering_factor_refinement/data_sherrell'
+    if seed > 0:
+      from scipy.interpolate import CubicSpline
+      sherrell_files=['Fe.dat','pf-rd-ox_fftkk.out']
+      u_ev = [7102,7107,7112,7117,7122, 7127, 7132, 7137, 7142]
+      #u_ev = [7100,7105,7110,7115,7120, 7125, 7130, 7135, 7140]
+      #u_ev = [x+2 for x in u_ev] 
+      storage = {}
+      fp0 = [] # for high and low energy remotes
+      fdp0 = [] # for high and low energy remotes
+      ev0=[]
+      for sherrell_file in sherrell_files:
+        energies = []
+        all_fp = []
+        all_fdp = []
+        with open(os.path.join(sherrell_dir, sherrell_file), 'r') as f:
+          for line in f:
+            if line !='\n':
+              ax = line.split()
+              ev = float(ax[0])
+              fp = float(ax[1])
+              fdp = float(ax[2])
+              if ev < 7200 and ev > 7050:
+                energies.append(ev)
+                all_fp.append(fp)
+                all_fdp.append(fdp)
+                if sherrell_file == sherrell_files[0]:
+                  fp0.append(fp)
+                  fdp0.append(fdp)
+                  ev0.append(ev)
+        x=(energies, all_fp, all_fdp)
+        csp=CubicSpline(energies, all_fp)
+        csdp=CubicSpline(energies, all_fdp)
+        y_fp=csp(u_ev)
+        y_fdp=csdp(u_ev)
+        storage[sherrell_file]=(y_fp, y_fdp)  
+      if seed == 1:
+        energies, all_fp, all_fdp =  u_ev, list(storage['Fe.dat'][0]), list(storage['Fe.dat'][1])
+      if seed == 3:
+        energies, all_fp, all_fdp =  u_ev, list(storage['pf-rd-ox_fftkk.out'][0]), list(storage['pf-rd-ox_fftkk.out'][1]) 
 
-    if use_henke: 
-      energies = range(7000, 7300, 1) 
-      scatterer = henke.table("Fe")
-      all_fp = []
-      all_fdp = []
-      for energy in energies:
-        all_fp.append(scatterer.at_ev(energy).fp())
-        all_fdp.append(scatterer.at_ev(energy).fdp())
-      if True:
-        print ('Has ev_offset of %5.2f'%ev_offset)
-        energies = [x+ev_offset for x in energies]
 
-    else:
-      from libtbx.easy_pickle import load
-      if ev_offset == -3:
-        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
-      if ev_offset == -2:
-        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/reduced_Fe.pickle'))
-      if ev_offset == -1:
-        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
-        #energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
-        #energies = [x-10 for x in energies] 
-      if ev_offset == -20:
-        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
-        energies = [x+20 for x in energies] 
+      # Creat mcmc moves
+      if seed > 3:
+        all_fp = []
+        all_fdp = []
+        energies = []
+        flex.set_random_seed(seed)
+        alpha=flex.random_double()
+        print ('Random seed and aplha = %d  %5.2f'%(seed, alpha))
+        padding = 0.0
+        
+        for ii, ev in enumerate(u_ev):
+          # get Fe0 data
+          fp00=storage[sherrell_files[0]][0][ii]
+          fdp00=storage[sherrell_files[0]][1][ii]
+          fp3=storage[sherrell_files[1]][0][ii]
+          fdp3=storage[sherrell_files[1]][1][ii]
+          #from IPython import embed; embed(); exit()
+        
+          t_fp = fp00+alpha*(fp3-fp00+padding)
+          t_fdp = fdp00+alpha*(fdp3-fdp00+padding)
+          all_fp.append(t_fp)
+          all_fdp.append(t_fdp)
+          energies.append(ev)
 
-      if ev_offset == -10:
-        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
-        energies = [x+10 for x in energies] 
+      # End monte carlo bit
+
+      # Make sure you take care of remote fp/fdp values on both sides
+      #from IPython import embed; embed(); exit()
+      energies = [ev0[0]]+energies
+      all_fp = [fp0[0]]+all_fp
+      all_fdp = [fdp0[0]]+all_fdp
+      #
+      energies = energies + [ev0[-1]]
+      all_fp = all_fp + [fp0[-1]]
+      all_fdp = all_fdp + [fdp0[-1]]
+      
+ 
+
+    #if ev_offset == -20:
+    #  energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
+    #  energies = [x+20 for x in energies] 
+#
+    #if ev_offset == -10:
+    #  energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
+    #  energies = [x+10 for x in energies] 
     
     from scipy.interpolate import interp1d
     
@@ -258,10 +330,14 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     
     #from IPython import embed; embed(); exit()
     if False:
+      ev3, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
+      #ev3, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
       import matplotlib.pyplot as plt
-      from IPython import embed; embed(); exit()
+      #from IPython import embed; embed(); exit()
       plt.scatter(interp_energies, interp_fdp)
+      plt.scatter(ev3, all_fdp)
       plt.scatter(interp_energies, interp_fp)
+      plt.scatter(ev3, all_fp)
       plt.show()
     fp_fdp = (flex.double(interp_fp), flex.double(interp_fdp))
     fp_fdp_0 = (flex.double([0.0]*len(interp_fp)), flex.double([0.0]*len(interp_fdp)))
@@ -288,7 +364,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
             'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'panels':panels, 'fp_fdp':fp_fdp, 'fp_fdp_0':fp_fdp_0}
 
 
-def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None, ev_offset=0.0):
+def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None, seed=0.0):
     from argparse import ArgumentParser
     from simtbx.diffBragg.refiners import RefineAll_JF1M_MultiPanel
     from simtbx.diffBragg.sim_data import SimData
@@ -300,7 +376,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
     from dials.array_family import flex
     import os
 
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.1, resmax=3.5, ls49_data_dir=ls49_data_dir, ev_offset=ev_offset)
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.1, resmax=3.5, ls49_data_dir=ls49_data_dir, seed=seed)
     C = data["dxcrystal"]
     D = data["dxdetector"]
     B = data["dxbeam"]
@@ -497,6 +573,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
     #  RUC.run(setup=False) # Now it will use curvatures
 
       RUC.run()
+      from IPython import embed; embed(); exit()
       refined_ncells = RUC.x[RUC.ncells_xpos]
       refined_scale = RUC.x[-1]
       refined_gain = RUC.x[-2]
@@ -678,13 +755,13 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
       plt.show()
       exit()
     # FIXME final return here
-    return
+    return RUC.f_vals[-1]
 
 if __name__ == "__main__":
     import os, sys
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/out_jungfrau_shoeboxes2'
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_on_refinement_07May20/out_jungfrau_shoeboxes_v3'
-    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_setup_before_scattering_factor/out_jungfrau_shoeboxes_v1'
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_setup_before_scattering_factor/out_jungfrau_shoeboxes_v2'
     ts='20180501114703722'
     #ts='20180501132216201'
     #ts='20180501120317142'
@@ -699,4 +776,4 @@ if __name__ == "__main__":
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None, ev_offset=-3)
+    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=False, params=None, seed=44)
