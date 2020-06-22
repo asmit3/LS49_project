@@ -38,7 +38,9 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                             resmax=12.0, resmin=3.0,
                             #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
+                            #mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
+                            pdb_file='Refine47_withFE.pdb',
+                            ev_offset=0.0,
                             ls49_data_dir=None):
     import os, pickle, numpy as np
     from scipy.interpolate import interp1d
@@ -49,6 +51,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     from iotbx import mtz
     import libtbx.load_env
     from dials.util import Sorry
+    import math
 
     if ls49_data_dir is None:
       LS49_regression = libtbx.env.find_in_repositories(
@@ -84,12 +87,61 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
       if j1<0: j1=0
        
       temp_img=img[refl['panel']][j1:j2, i1:i2]
+      #from IPython import embed; embed(); exit()
+      #sorted_img=np.sort(temp_img.flatten())
+      #bg=sorted_img[10:100]
+      #fg=sorted_img[-10:]
+      #bgm=np.mean(bg)
+      #fgm=np.mean(fg)
       snr.append(np.max(temp_img)/np.std(temp_img))
+      #snr.append((fgm)/bgm)
 
+    # FIXME WHICH SNR TO USE ??
     #snr = refls['intensity.sum.value'] / flex.sqrt(refls['intensity.sum.variance'])
+    #from IPython import embed; embed(); exit()
     order = np.argsort(snr)[::-1]
     min_snr=1.0
     refls=refls.select(snr>min_snr)
+
+    # Filter out based on whether bbox is near the edge of detector
+    # Spurious refinement noticed
+    keep_refl=flex.bool(len(refls), True)
+    #from IPython import embed; embed(); exit()
+    for ii,refl in enumerate(refls.rows()):
+      #from IPython import embed; embed(); exit()
+      x1,x2,y1,y2=refl['bbox'][0:4]
+      #if refl['panel'] not in [7,3,15,11]: continue
+      if x2 > 255 and refl['panel'] in [7,3,15,11]:
+        keep_refl[ii]=False
+        continue
+      #if x2 < 1 or x2 > 255:
+      #  keep_refl[ii]=False
+      #  continue
+      #if y1 < 1 or y1 > 255:
+      #  keep_refl[ii]=False
+      #  continue
+      #if y2 < 1 or y2 > 255:
+      #  keep_refl[ii]=False
+      #  continue
+    refls=refls.select(keep_refl)  
+    # Filter here based on only strong spots. This is to avoid blank shoeboxes being processed by diffbragg
+    strong_refls=flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../../out_jungfrau_spotfinding_v3/idx-jungfrauhit_%s_strong.refl'%tstamp))
+    int_px=refls['xyzobs.px.value']
+    strong_px=strong_refls['xyzobs.px.value']
+    keep_spots = flex.bool(len(int_px), False)
+  
+    critical_dist = 10 # in pixels
+    for ii, spot in enumerate(int_px):
+      x0,y0,z0  = spot
+      for jj, strong_spot in enumerate(strong_px):
+        x,y,z = strong_spot
+        dist = math.sqrt((x-x0)*(x-x0)+(y-y0)*(y-y0))
+        if dist < critical_dist:
+          keep_spots[ii]=True
+          break
+    refls=refls.select(keep_spots)
+    #from IPython import embed; embed(); exit()
+
     #refls = refls.select(snr > snr[order[Nstrongest]])
 
     bboxes = [list(refls['shoebox'][i].bbox)[:4] for i in range(len(refls)) ]
@@ -99,7 +151,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     bboxes[bboxes > 256] = 255
     bboxes[bboxes < 0] = 0
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
-    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v3/jungfrau_indexed_only_%s.refl'%tstamp))
+    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v1/no_duplicate_millers/select_best_jf_refined/jf_refined_%s.refl'%tstamp))
+    #R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v3/jungfrau_indexed_only_%s.refl'%tstamp))
     n_panels=16
     strong_mask = strong_spot_mask(refls=R2, panel_size=img[0].shape, n_panels=n_panels)
     is_bg_pixel = []
@@ -140,29 +193,102 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,'../../all_files/rayonix_expt/',fee_file), 'r'))[tstamp]).T
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
-    min_energy_interpol = max_energy - 35
-    max_energy_interpol = max_energy + 35
+    min_energy_interpol = max(max_energy - 35, min(chann_lambda))
+    max_energy_interpol = min(max_energy + 35, max(chann_lambda))
     print ('INTERPOLATION ENERGIES = ', min_energy_interpol, max_energy_interpol)
     interp_energies = np.arange(min_energy_interpol, max_energy_interpol, 0.5)
     interp_fluxes = I(interp_energies)
     interp_fluxes /= interp_fluxes.sum()
     interp_fluxes *= 1000000000000.0
     spectrum = zip(12398.419739640716 / interp_energies, interp_fluxes)
+   
+    ########## FP/FDP stuff #################### 
+    # Generate fp/fdp as desired for Fe
+    from cctbx.eltbx import henke
+    import numpy as np
+
+    use_henke=True 
+    # Key here
+    # ev_offset >=0: use_henke=True
+    # ev_offset == -2, use Fe+2 table i.e reduced
+    # ev_offset == -3, use Fe+3 table, i.e oxidized
+
+
+    if ev_offset < 0: 
+      use_henke = False
+
+    if use_henke: 
+      energies = range(7000, 7300, 1) 
+      scatterer = henke.table("Fe")
+      all_fp = []
+      all_fdp = []
+      for energy in energies:
+        all_fp.append(scatterer.at_ev(energy).fp())
+        all_fdp.append(scatterer.at_ev(energy).fdp())
+      if True:
+        print ('Has ev_offset of %5.2f'%ev_offset)
+        energies = [x+ev_offset for x in energies]
+
+    else:
+      from libtbx.easy_pickle import load
+      if ev_offset == -3:
+        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
+      if ev_offset == -2:
+        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/reduced_Fe.pickle'))
+      if ev_offset == -1:
+        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
+        #energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
+        #energies = [x-10 for x in energies] 
+      if ev_offset == -20:
+        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
+        energies = [x+20 for x in energies] 
+
+      if ev_offset == -10:
+        energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
+        energies = [x+10 for x in energies] 
+    
+    from scipy.interpolate import interp1d
+    
+
+    interpolator = interp1d(energies, all_fp)
+    interpolator2 = interp1d(energies, all_fdp)
+
+    interp_fp = interpolator(interp_energies)
+    interp_fdp = interpolator2(interp_energies)
+    
+    #from IPython import embed; embed(); exit()
+    if False:
+      import matplotlib.pyplot as plt
+      from IPython import embed; embed(); exit()
+      plt.scatter(interp_energies, interp_fdp)
+      plt.scatter(interp_energies, interp_fp)
+      plt.show()
+    fp_fdp = (flex.double(interp_fp), flex.double(interp_fdp))
+    fp_fdp_0 = (flex.double([0.0]*len(interp_fp)), flex.double([0.0]*len(interp_fdp)))
+    
+    #############################################
 
 
     #M = mtz.object('ls49_oxy_2.5_s0_mark0.mtz')
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
 
-    M = mtz.object(os.path.join(ls49_data_dir,'../../all_files/',mtz_file))
+    #M = mtz.object(os.path.join(ls49_data_dir,'../../all_files/',mtz_file))
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
-    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs(+)')]
-    sfall = sfall.as_amplitude_array()
+    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs(+)')]
+    #sfall = sfall.as_amplitude_array()
+
+
+    # Generate complex structure factors here from the PDB file and pass along
+    #  
+    sfall = utils.get_complex_fcalc_from_pdb(os.path.join(ls49_data_dir, '../../all_files/', pdb_file))
+
+
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
-            'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'panels':panels}
+            'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'panels':panels, 'fp_fdp':fp_fdp, 'fp_fdp_0':fp_fdp_0}
 
 
-def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None):
+def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None, ev_offset=0.0):
     from argparse import ArgumentParser
     from simtbx.diffBragg.refiners import RefineAll_JF1M_MultiPanel
     from simtbx.diffBragg.sim_data import SimData
@@ -172,8 +298,9 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
     from copy import deepcopy
     from dxtbx.model.experiment_list import Experiment, ExperimentList, ExperimentListFactory
     from dials.array_family import flex
+    import os
 
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.1, resmax=3.5, ls49_data_dir=ls49_data_dir)
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.1, resmax=3.5, ls49_data_dir=ls49_data_dir, ev_offset=ev_offset)
     C = data["dxcrystal"]
     D = data["dxdetector"]
     B = data["dxbeam"]
@@ -186,8 +313,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
                          scan=exp.scan,
                          crystal=C)
     dump_explist = ExperimentList([dump_exp])
-    dump_explist.as_file('before_refinement_%s.expt'%ts)
-    indexed_reflections.as_file('before_refinement_%s.refl'%ts)
+    dump_explist.as_file(os.path.join(outdir, 'before_refinement_%s.expt'%ts))
+    indexed_reflections.as_file(os.path.join(outdir, 'before_refinement_%s.refl'%ts))
 
     # Some global variables here for LS49
     mos_spread_deg=0.001
@@ -202,15 +329,15 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
 
 
     # Define number of macrocycles and strategies
-    n_macrocycles=4
-    total_cycles=2 #4*n_macrocycles
-    ncells_strategy =           [True,  False,  False,   False ]*n_macrocycles  + [True,]
-    local_spotscale_strategy =  [False, False,  False,   False ]*n_macrocycles  + [False,]
-    crystal_scale_strategy =    [True,  False,  False,   False ]*n_macrocycles + [True,]
+    n_macrocycles=2
+    total_cycles=4*n_macrocycles+2
+    ncells_strategy =           [True,  False,  False,   False ]*n_macrocycles  + [False, False]
+    local_spotscale_strategy =  [False, False,  False,   False ]*n_macrocycles  + [False, False]
+    crystal_scale_strategy =    [True,  False,  False,   False ]*n_macrocycles + [True, False]
 
-    background_strategy =       [False, False,  False,   True]*n_macrocycles +  [True,]
-    umat_strategy =             [False, True,   False,   False]*n_macrocycles + [True,]
-    bmat_strategy =             [False, False,  True,    False]*n_macrocycles + [True,]
+    background_strategy =       [False, False,  False,   True]*n_macrocycles +  [False, True]
+    umat_strategy =             [False, True,   False,   False]*n_macrocycles + [False, False]
+    bmat_strategy =             [False, False,  True,    False]*n_macrocycles + [False, False]
 
 
 
@@ -272,10 +399,16 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       nbcryst.thick_mm = 0.005
       nbcryst.miller_array = data["sfall"]
       nbcryst.dxtbx_crystal = C
+      if n_cycle >= 4*n_macrocycles: #total_cycles-1:
+        nbcryst.fp_fdp = data['fp_fdp']
+      else:
+        nbcryst.fp_fdp = data['fp_fdp_0']
+
 
       nbbeam = nanoBragg_beam.nanoBragg_beam()
       nbbeam.unit_s0 = B.get_unit_s0()
       nbbeam.spectrum = data["spectrum"]
+      
 
       SIM = SimData()
       # maybe make Ncells very small e.g. 5x5x5
@@ -292,7 +425,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       
       SIM.D.detector_attenuation_length_mm = 0
       SIM.D.detector_thicksteps = 0
-      SIM.D.point_pixel = True  # NOTE detector distance negative bug
+      SIM.D.point_pixel = False  # NOTE detector distance negative bug
       SIM.D.show_params()
       #SIM.D.beam_center_mm=D[data['panels'][0]].get_beam_centre(B.get_unit_s0())
       #SIM.D.spot_scale = 1e6 # to guide your eye
@@ -322,6 +455,11 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
           #    plt.gca().add_patch(patch)
           #plt.show()
       n_spots = len(data['tilt_abc'])
+      # DANGER FIXME
+      if n_spots < 2:
+        print ('Too few spots for diffbragg refinement :  %s'%ts)
+        return
+      #
       RUC = RefineAll_JF1M_MultiPanel(
         spot_rois=data["bboxes_x1x2y1y2"],
         spot_resolution=data['resolution'],
@@ -335,7 +473,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
         init_scale=refined_scale,
         init_local_spotscale = refined_local_spotscale,
         panel_id=data['panels'][0],
-        panel_ids=data['panels'])
+        panel_ids=data['panels'],
+        timestamp=ts)
       RUC.trad_conv = True
       RUC.trad_conv_eps = 1e-5
       RUC.max_calls = 250
@@ -471,6 +610,10 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
 
       C.show()
       C2.show()
+      # Make sure refinement passes sanity checks
+      
+
+
       dump_exp = Experiment(imageset=data['cbf_imageset'], 
                            beam=B,
                            detector=D,
@@ -534,16 +677,26 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
       plt.imshow(img, vmax=vmax, vmin=vmin)
       plt.show()
       exit()
-    exit()
-
+    # FIXME final return here
+    return
 
 if __name__ == "__main__":
     import os, sys
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/out_jungfrau_shoeboxes2'
-    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_on_refinement_07May20/out_jungfrau_shoeboxes_v3'
+    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_on_refinement_07May20/out_jungfrau_shoeboxes_v3'
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_setup_before_scattering_factor/out_jungfrau_shoeboxes_v1'
     ts='20180501114703722'
+    #ts='20180501132216201'
     #ts='20180501120317142'
+    # Debugging on 16 june regarding weird likelihood values
+    #ts='20180501131709048' # ts with np.max(fe3-fe0) 
+    #ts='20180501172057358'
+    #ts='20180501172221032' 
+    #ts='20180501112219788'
+    #ts='20180501155759914' # 13 spots ?? --> wrong, this has diverged in dials refinement. c-axis is way off ; please remove
+    #ts='20180501150413592' # near blank edge on RHS
+    #ts='20180501165717967'
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None)
+    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None, ev_offset=-3)
