@@ -31,7 +31,7 @@ LS49_diffBragg_phil_str='''
     Deff = 1000.0
       .type = float
       .help = Mosaic domain size initial estimate, will be refined eventually
-    ev_offset = 0.0
+    seed = 0.0
       .type = float
       .help = offset value for translating fp/fdp curve. Eg. using 10 means moving inflection point from 7112 to 7122
 }
@@ -132,10 +132,11 @@ class Script(object):
     ts = item_list[0] 
     print ('Inside do_work for rank %d'%rank)
     t_start = time.time()
-    final_likelihood = run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.ls49_data_dir, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir, params=self.params, ev_offset=self.params.LS49_diffBragg.ev_offset)
+    final_likelihood = run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.ls49_data_dir, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir, params=self.params, seed=self.params.LS49_diffBragg.seed)
     t_end = time.time()
     delta_time = t_end - t_start
     print ('DiffBragg_LS49_timing %s  = %d'%(ts,delta_time))
+    print ('Diff_Scattering_LogLikelihood = %d, %s, %.3f'%(self.params.LS49_diffBragg.seed, ts, final_likelihood))
 
 if __name__ == "__main__":
   try:

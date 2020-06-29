@@ -267,7 +267,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         y_fp=csp(u_ev)
         y_fdp=csdp(u_ev)
         storage[sherrell_file]=(y_fp, y_fdp)  
-      if seed == 1:
+      if seed == 1 or seed == 2:
         energies, all_fp, all_fdp =  u_ev, list(storage['Fe.dat'][0]), list(storage['Fe.dat'][1])
       if seed == 3:
         energies, all_fp, all_fdp =  u_ev, list(storage['pf-rd-ox_fftkk.out'][0]), list(storage['pf-rd-ox_fftkk.out'][1]) 
@@ -281,7 +281,10 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         flex.set_random_seed(seed)
         alpha=flex.random_double()
         print ('Random seed and aplha = %d  %5.2f'%(seed, alpha))
-        padding = 0.0
+        lower_lim = -0.9
+        upper_lim = 1.9
+        beta = (lower_lim)+alpha*(upper_lim - lower_lim)
+         
         
         for ii, ev in enumerate(u_ev):
           # get Fe0 data
@@ -291,8 +294,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
           fdp3=storage[sherrell_files[1]][1][ii]
           #from IPython import embed; embed(); exit()
         
-          t_fp = fp00+alpha*(fp3-fp00+padding)
-          t_fdp = fdp00+alpha*(fdp3-fdp00+padding)
+          t_fp = fp00+beta*(fp3-fp00)
+          t_fdp = fdp00+beta*(fdp3-fdp00)
           all_fp.append(t_fp)
           all_fdp.append(t_fdp)
           energies.append(ev)
@@ -329,18 +332,18 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     interp_fdp = interpolator2(interp_energies)
     
     #from IPython import embed; embed(); exit()
-    if False:
+    if True:
       ev3, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
       #ev3, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
       import matplotlib.pyplot as plt
       #from IPython import embed; embed(); exit()
-      plt.scatter(interp_energies, interp_fdp)
-      plt.scatter(ev3, all_fdp)
-      plt.scatter(interp_energies, interp_fp)
-      plt.scatter(ev3, all_fp)
+      plt.scatter(interp_energies, interp_fdp, c='g')
+      plt.scatter(ev3, all_fdp, c='k')
+      plt.scatter(interp_energies, interp_fp, c='b')
+      plt.scatter(ev3, all_fp, c = 'k')
       plt.show()
     fp_fdp = (flex.double(interp_fp), flex.double(interp_fdp))
-    fp_fdp_0 = (flex.double([0.0]*len(interp_fp)), flex.double([0.0]*len(interp_fdp)))
+    fp_fdp_0 = (flex.double([0.0]*len(interp_energies)), flex.double([0.0]*len(interp_energies)))
     
     #############################################
 
@@ -357,7 +360,6 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     # Generate complex structure factors here from the PDB file and pass along
     #  
     sfall = utils.get_complex_fcalc_from_pdb(os.path.join(ls49_data_dir, '../../all_files/', pdb_file))
-
 
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
@@ -405,15 +407,15 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
 
 
     # Define number of macrocycles and strategies
-    n_macrocycles=2
-    total_cycles=4*n_macrocycles+2
-    ncells_strategy =           [True,  False,  False,   False ]*n_macrocycles  + [False, False]
-    local_spotscale_strategy =  [False, False,  False,   False ]*n_macrocycles  + [False, False]
-    crystal_scale_strategy =    [True,  False,  False,   False ]*n_macrocycles + [True, False]
+    n_macrocycles=5
+    total_cycles=4*n_macrocycles
+    ncells_strategy =           [True,  False,  False,   False ]*n_macrocycles # + [False, False]
+    local_spotscale_strategy =  [False, False,  False,   False ]*n_macrocycles # + [False, False]
+    crystal_scale_strategy =    [True,  False,  False,   False ]*n_macrocycles #+ [True, False]
 
-    background_strategy =       [False, False,  False,   True]*n_macrocycles +  [False, True]
-    umat_strategy =             [False, True,   False,   False]*n_macrocycles + [False, False]
-    bmat_strategy =             [False, False,  True,    False]*n_macrocycles + [False, False]
+    background_strategy =       [False, False,  False,   True]*n_macrocycles   #+  [False, True]
+    umat_strategy =             [False, True,   False,   False]*n_macrocycles  #+ [False, False]
+    bmat_strategy =             [False, False,  True,    False]*n_macrocycles  #+ [False, False]
 
 
 
@@ -475,10 +477,10 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
       nbcryst.thick_mm = 0.005
       nbcryst.miller_array = data["sfall"]
       nbcryst.dxtbx_crystal = C
-      if n_cycle >= 4*n_macrocycles: #total_cycles-1:
-        nbcryst.fp_fdp = data['fp_fdp']
-      else:
-        nbcryst.fp_fdp = data['fp_fdp_0']
+      #if n_cycle >= 4*n_macrocycles: #total_cycles-1:
+      #  nbcryst.fp_fdp = data['fp_fdp']
+      #else:
+      nbcryst.fp_fdp = data['fp_fdp_0']
 
 
       nbbeam = nanoBragg_beam.nanoBragg_beam()
@@ -539,7 +541,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
       RUC = RefineAll_JF1M_MultiPanel(
         spot_rois=data["bboxes_x1x2y1y2"],
         spot_resolution=data['resolution'],
-        abc_init=data["tilt_abc"],
+        abc_init=refined_tilt_abc,
         img=data["data_img"],
         SimData_instance=SIM,
         plot_images=True,
@@ -573,11 +575,15 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
     #  RUC.run(setup=False) # Now it will use curvatures
 
       RUC.run()
-      from IPython import embed; embed(); exit()
       refined_ncells = RUC.x[RUC.ncells_xpos]
       refined_scale = RUC.x[-1]
       refined_gain = RUC.x[-2]
       refined_local_spotscale = RUC.x[RUC.n_bg:RUC.n_bg+RUC.n_spots]
+      refined_tilt_abc=[]
+      for i in range(RUC.n_spots):
+        refined_tilt_abc.append([RUC.x[i], RUC.x[RUC.n_spots+i], RUC.x[2*RUC.n_spots+i]])
+      refined_tilt_abc=np.array(refined_tilt_abc)
+
 
       if n_cycle==0:
         RUC0=RUC
@@ -711,7 +717,20 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
         ref_predictor(indexed_reflections)
         if n_cycle==total_cycles-1:
           indexed_reflections.as_file(os.path.join(outdir, 'after_refinement_%s_%s.refl'%(ts,n_cycle)))
+          # Also dumping important stuff for mcmc bit
+          dump_dict = {}
+          dump_dict['refined_ncells'] = refined_ncells
+          dump_dict['refined_scale'] = refined_scale
+          dump_dict['refined_gain'] = refined_gain
+          dump_dict['refined_local_spotscale'] = refined_local_spotscale
+          dump_dict['refined_tilt_abc'] = refined_tilt_abc
+          dump_dict['C'] = C
+          dump_dict['D'] = D
+          dump_dict['B'] = B
+          from libtbx.easy_pickle import dump
+          dump(os.path.join(outdir, 'RUC_info_%s.pickle'%ts), dump_dict )
 
+      # Important here
       C=C2
 
 
@@ -776,4 +795,4 @@ if __name__ == "__main__":
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=False, params=None, seed=44)
+    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=False, params=None, seed=1)
