@@ -236,8 +236,9 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
       from scipy.interpolate import CubicSpline
       sherrell_files=['Fe.dat','pf-rd-ox_fftkk.out']
       u_ev = [7102,7107,7112,7117,7122, 7127, 7132, 7137, 7142]
+      #u_ev = range(7100, 7150)
       #u_ev = [7100,7105,7110,7115,7120, 7125, 7130, 7135, 7140]
-      #u_ev = [x+2 for x in u_ev] 
+      #u_ev = [x-2 for x in u_ev] 
       storage = {}
       fp0 = [] # for high and low energy remotes
       fdp0 = [] # for high and low energy remotes
@@ -262,6 +263,11 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                   fdp0.append(fdp)
                   ev0.append(ev)
         x=(energies, all_fp, all_fdp)
+        #from scipy.interpolate import interp1d
+        #ip=interp1d(energies, all_fp)
+        #idp=interp1d(energies, all_fdp)
+        #y_fp = ip(u_ev)
+        #y_fdp = idp(u_ev)
         csp=CubicSpline(energies, all_fp)
         csdp=CubicSpline(energies, all_fdp)
         y_fp=csp(u_ev)
@@ -278,11 +284,12 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         all_fp = []
         all_fdp = []
         energies = []
-        flex.set_random_seed(seed)
-        alpha=flex.random_double()
+        #flex.set_random_seed(seed)
+        #alpha=flex.random_double()
+        alpha=(seed-3)/48.0
         print ('Random seed and aplha = %d  %5.2f'%(seed, alpha))
-        lower_lim = -0.9
-        upper_lim = 1.9
+        lower_lim = -0.2
+        upper_lim = 1.2
         beta = (lower_lim)+alpha*(upper_lim - lower_lim)
          
         
@@ -332,7 +339,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     interp_fdp = interpolator2(interp_energies)
     
     #from IPython import embed; embed(); exit()
-    if True:
+    if False:
       ev3, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/oxidized_Fe.pickle'))
       #ev3, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
       import matplotlib.pyplot as plt
@@ -480,7 +487,9 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
       #if n_cycle >= 4*n_macrocycles: #total_cycles-1:
       #  nbcryst.fp_fdp = data['fp_fdp']
       #else:
+      #from IPython import embed; embed(); exit()
       nbcryst.fp_fdp = data['fp_fdp_0']
+      #nbcryst.use_Fhk_lplus1 = True
 
 
       nbbeam = nanoBragg_beam.nanoBragg_beam()
@@ -795,4 +804,4 @@ if __name__ == "__main__":
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=False, params=None, seed=1)
+    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=False, params=None, seed=12)
