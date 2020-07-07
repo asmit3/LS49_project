@@ -41,7 +41,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                             #mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
                             pdb_file='Refine47_withFE.pdb',
                             seed=0.0,
-                            ls49_data_dir=None):
+                            ls49_data_dir=None,
+                            swap_spectra_timestamp=False):
     import os, pickle, sys, numpy as np
     from scipy.interpolate import interp1d
     import dxtbx
@@ -189,8 +190,16 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         tilts.append(tilt)
         tilt_abc[i_spot] = (coeff[1], coeff[2], coeff[0])
 
-    fee_file='idx-fee_data_%s.pickle'%tstamp
-    chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,'../../all_files/rayonix_expt/',fee_file), 'r'))[tstamp]).T
+    if not swap_spectra_timestamp:
+      fee_file='idx-fee_data_%s.pickle'%tstamp
+      chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,'../../all_files/rayonix_expt/',fee_file), 'r'))[tstamp]).T
+    if swap_spectra_timestamp:
+      from libtbx.easy_pickle import load
+      swap_ts_dict = load(os.path.join(ls49_data_dir, '../swap_spectra_timestamps_list.pickle'))
+      swap_ts = swap_ts_dict[tstamp]
+      print ('Swapping spectra of %s with %s'%(tstamp, swap_ts))
+      fee_file='idx-fee_data_%s.pickle'%swap_ts
+      chann_lambda, channI = np.array(pickle.load(open(os.path.join(ls49_data_dir,'../../all_files/rayonix_expt/',fee_file), 'r'))[swap_ts]).T 
     I = interp1d(chann_lambda, channI)
     max_energy  = chann_lambda[np.argmax(channI)]
     min_energy_interpol = max(max_energy - 35, min(chann_lambda))
@@ -373,7 +382,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
             'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'panels':panels, 'fp_fdp':fp_fdp, 'fp_fdp_0':fp_fdp_0}
 
 
-def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None, seed=0.0):
+def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None, seed=0.0, swap_spectra_timestamp=False):
     from argparse import ArgumentParser
     from simtbx.diffBragg.refiners import RefineAll_JF1M_MultiPanel
     from simtbx.diffBragg.sim_data import SimData
@@ -385,7 +394,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
     from dials.array_family import flex
     import os
 
-    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.1, resmax=3.5, ls49_data_dir=ls49_data_dir, seed=seed)
+    data = process_ls49_image_real(tstamp=ts,Nstrongest=10, resmin=2.1, resmax=3.5, ls49_data_dir=ls49_data_dir, seed=seed, swap_spectra_timestamp=swap_spectra_timestamp)
     C = data["dxcrystal"]
     D = data["dxdetector"]
     B = data["dxbeam"]
@@ -804,4 +813,4 @@ if __name__ == "__main__":
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=False, params=None, seed=12)
+    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None, seed=12, swap_spectra_timestamp=False)
