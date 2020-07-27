@@ -89,7 +89,7 @@ def process_ls49_image_real2(experiments,
     bboxes[bboxes > 960] = 959
     bboxes[bboxes < 0] = 0
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
-    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_indexed.refl'%tstamp))
+    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../reindexed_rayonix', 'idx-%s_indexed.refl'%tstamp))
     R2=R2.select(R2['id']==0)
     strong_mask = strong_spot_mask(refl_tbl=R2, img_size=img.shape)
     is_bg_pixel = np.logical_not(strong_mask)

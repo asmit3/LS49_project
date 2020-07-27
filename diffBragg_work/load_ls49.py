@@ -100,7 +100,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                             resmax=12.0, resmin=3.0,
                             #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
-                            mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_fromsampleresid_m008_s0_mark0.mtz',
+                            #mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_fromsampleresid_m008_s0_mark0.mtz',
+                            mtz_file='anom_ls49_oxy_2.1_gentle_doubleloop_pr_lorentz_m021_s0_mark0.mtz',
                             #mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_unit_pr_lorentz_primeref_m008_s0_mark0.mtz',
                             outlier_with_diffBragg=True,
@@ -133,8 +134,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     cbf_imageset = loader.get_imageset([os.path.join(ls49_data_dir,'idx-%s.cbf'%tstamp)])
     
     img = loader.get_raw_data().as_numpy_array() / GAIN
-    exp_list = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'idx-%s_integrated.expt'%tstamp), check_format=False)[0:1]
-    refls = flex.reflection_table.from_file(os.path.join(ls49_data_dir,'idx-%s_integrated.refl'%tstamp))
+    exp_list = ExperimentListFactory.from_json_file(os.path.join(ls49_data_dir,'../reindexed_rayonix','idx-%s_integrated.expt'%tstamp), check_format=False)[0:1]
+    refls = flex.reflection_table.from_file(os.path.join(ls49_data_dir,'../reindexed_rayonix','idx-%s_integrated.refl'%tstamp))
     refls=refls.select(refls['id']==0)
     # Filter reflections if necessary depending on predictions from diffBragg ?
     if outlier_with_diffBragg:
@@ -190,7 +191,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     bboxes_validation[bboxes_validation < 0] = 0
     # end validation stuff
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
-    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, 'idx-%s_indexed.refl'%tstamp))
+    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../reindexed_rayonix', 'idx-%s_indexed.refl'%tstamp))
     R2=R2.select(R2['id']==0)
     strong_mask = strong_spot_mask(refl_tbl=R2, img_size=img.shape)
     is_bg_pixel = np.logical_not(strong_mask)
@@ -236,7 +237,8 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
 
     M = mtz.object(os.path.join(ls49_data_dir,'../',mtz_file))
     #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs')]
-    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
+    sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'Iobs(+)')]
+    #sfall = M.as_miller_arrays_dict()[('crystal', 'dataset', 'IMEAN')]
     sfall = sfall.as_amplitude_array()
     return {'dxcrystal': C, 'dxdetector': D, 'dxbeam': B, 'mill_idx': mill_idx, 'data_img': img, 'bboxes_x1x2y1y2': bboxes, 
        'tilt_abc': tilt_abc, 'spectrum': spectrum, 'sfall': sfall,
