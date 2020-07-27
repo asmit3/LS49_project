@@ -34,6 +34,9 @@ LS49_diffBragg_phil_str='''
     seed = 0.0
       .type = float
       .help = offset value for translating fp/fdp curve. Eg. using 10 means moving inflection point from 7112 to 7122
+    swap_spectra_timestamp = False
+      .type = bool
+      .help = If true, swap spectra of timestamp with another timestamp as read in from a pre-specified file
 }
 '''
 #phil_scope = parse(LS49_diffBragg_phil_str)
@@ -132,7 +135,7 @@ class Script(object):
     ts = item_list[0] 
     print ('Inside do_work for rank %d'%rank)
     t_start = time.time()
-    final_likelihood = run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.ls49_data_dir, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir, params=self.params, seed=self.params.LS49_diffBragg.seed)
+    final_likelihood = run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.ls49_data_dir, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir, params=self.params, seed=self.params.LS49_diffBragg.seed, swap_spectra_timestamp=self.params.LS49_diffBragg.swap_spectra_timestamp)
     t_end = time.time()
     delta_time = t_end - t_start
     print ('DiffBragg_LS49_timing %s  = %d'%(ts,delta_time))
