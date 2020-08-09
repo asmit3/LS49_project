@@ -1,6 +1,4 @@
 #
-# File courtesy Derek Mendez
-# Copying it from cctbx_project/simtbx/diffBragg to make more local edits here instead of in cctbx
 #
 #
 from load_ls49_JF1M import strong_spot_mask, process_ls49_image_real
@@ -57,7 +55,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
 
 
     # Define number of macrocycles and strategies
-    n_macrocycles=2
+    n_macrocycles=5
     total_cycles=3*n_macrocycles
     ncells_strategy =           [True,  False, False, ]*n_macrocycles
     local_spotscale_strategy =  [False, False, False,]*n_macrocycles

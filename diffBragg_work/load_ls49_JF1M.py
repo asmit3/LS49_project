@@ -39,7 +39,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                             #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
                             #mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
-                            pdb_file='Refine47_withFE.pdb',
+                            pdb_file='Refine_t10_17_withFE.pdb',
                             seed=0.0,
                             ls49_data_dir=None,
                             swap_spectra_timestamp=False):
@@ -152,7 +152,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     bboxes[bboxes > 256] = 255
     bboxes[bboxes < 0] = 0
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
-    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v2/no_duplicate_millers/select_best_jf_refined/jf_refined_%s.refl'%tstamp))
+    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v2/no_duplicate_millers/refine_each_expt_with_fixed_final_JF1M_geom/jf_refined_%s.refl'%tstamp))
     #R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v3/jungfrau_indexed_only_%s.refl'%tstamp))
     n_panels=16
     strong_mask = strong_spot_mask(refls=R2, panel_size=img[0].shape, n_panels=n_panels)
@@ -240,7 +240,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     # 0 --> neutral Fe, no fp/fdp added
     # 1 --> Use fp/fdp discretized curve from Fe.dat neutral
     # 3 --> use fp/fdp discretized curve from Fe3 sherrell data 
-    sherrell_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_setup_before_scattering_factor/scattering_factor_refinement/data_sherrell'
+    sherrell_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_after_fixing_twinning_24July20/scattering_factor_refinement/data_sherrell'
     if seed > 0:
       from scipy.interpolate import CubicSpline
       sherrell_files=['Fe.dat','pf-rd-ox_fftkk.out']
@@ -798,7 +798,7 @@ if __name__ == "__main__":
     import os, sys
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/out_jungfrau_shoeboxes2'
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_on_refinement_07May20/out_jungfrau_shoeboxes_v3'
-    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_setup_before_scattering_factor/out_jungfrau_shoeboxes_v2'
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_after_fixing_twinning_24July20/out_jungfrau_shoeboxes_v2'
     ts='20180501114703722'
     #ts='20180501132216201'
     #ts='20180501120317142'
@@ -813,4 +813,4 @@ if __name__ == "__main__":
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None, seed=12, swap_spectra_timestamp=False)
+    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None, seed=-1, swap_spectra_timestamp=False)
