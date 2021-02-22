@@ -39,7 +39,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
                             #mtz_file='5cmv_Iobs.mtz',
                             #mtz_file='anom_ls49_oxy_2.3_t3_gentle_pr_s0_mark0.mtz',
                             #mtz_file='anom_ls49_oxy_2.1_unit_pr_lorentz_double_primeref_m008_s0_mark0.mtz',
-                            pdb_file='Refine_t10_17_withFE.pdb',
+                            pdb_file='Refine_t10_41_withFE.pdb',
                             seed=0.0,
                             ls49_data_dir=None,
                             swap_spectra_timestamp=False):
@@ -140,8 +140,16 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
         if dist < critical_dist:
           keep_spots[ii]=True
           break
-    refls=refls.select(keep_spots)
     #from IPython import embed; embed(); exit()
+    # Creating a case where I should have a minimum of 2 spots per image to process 
+    refls=refls.select(keep_spots)
+    #else:
+    #  # Otherwise select based on SNR
+    #  # THis part was added on 26Jan21 because I wanted to ensure all images were refined, even ones with weak spots
+    #  snr=refls['intensity.sum.value'] / flex.sqrt(refls['intensity.sum.variance'])
+    #  snr_2nd_highest = flex.sorted(snr, reverse=True)[1]
+    #  refls=refls.select(snr > snr_2nd_highest-0.1) # Arbitrary 0.1 buffer
+      #from IPython import embed; embed(); exit()
 
     #refls = refls.select(snr > snr[order[Nstrongest]])
 
@@ -152,7 +160,12 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     bboxes[bboxes > 256] = 255
     bboxes[bboxes < 0] = 0
     mill_idx = [ list(refls['miller_index'][i]) for i in range(len(refls)) ]
-    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v2/no_duplicate_millers/refine_each_expt_with_fixed_final_JF1M_geom/jf_refined_%s.refl'%tstamp))
+    #if os.path.exists((os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v3/no_duplicate_millers/refine_each_expt_with_fixed_final_JF1M_geom/jf_refined_%s.refl'%tstamp))): 
+    R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v3/no_duplicate_millers/refine_each_expt_with_fixed_final_JF1M_geom/jf_refined_%s.refl'%tstamp))
+    #else:
+      #exit()
+    #  R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../../out_jungfrau_spotfinding_v3/idx-jungfrauhit_%s_strong.refl'%tstamp))
+      #R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir,'jungfrau_shoeboxes_%s.refl'%tstamp))
     #R2 = flex.reflection_table.from_file(os.path.join(ls49_data_dir, '../out_using_diffBragg_rayonix_v3/jungfrau_indexed_only_%s.refl'%tstamp))
     n_panels=16
     strong_mask = strong_spot_mask(refls=R2, panel_size=img[0].shape, n_panels=n_panels)
@@ -209,6 +222,12 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     interp_fluxes = I(interp_energies)
     interp_fluxes /= interp_fluxes.sum()
     interp_fluxes *= 1000000000000.0
+
+    #lower_ee=7111
+    #upper_ee=lower_ee+3.0
+    #for ii, ee in enumerate(interp_energies):
+    #  if ee < lower_ee or ee > upper_ee:
+    #    interp_fluxes[ii] = 0.0
     spectrum = zip(12398.419739640716 / interp_energies, interp_fluxes)
    
     ########## FP/FDP stuff #################### 
@@ -234,6 +253,16 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
     if seed == -1:
       energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle'))
 
+    # This is sliding the Fe0 curve along the energy axis
+    if seed < -3:
+      energies, all_fp, all_fdp = load(os.path.join(ls49_data_dir, '../scattering_factor_refinement/data_sherrell/neutral_Fe.pickle')) 
+      alpha=(abs(seed)-3)/48.0
+      print ('Random seed and aplha = %d  %5.2f'%(seed, alpha))
+      lower_lim = -0.2
+      upper_lim = 1.2
+      beta = (lower_lim)+alpha*(upper_lim - lower_lim)
+      energy_factor = beta*10 # Doing it in a 10ev window (7112-7122 ev)
+      energies = [x+energy_factor for x in energies] 
 
     # Create mcmc random curves if seed > 3
     # Reserved numbers
@@ -316,6 +345,10 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
           all_fdp.append(t_fdp)
           energies.append(ev)
 
+        
+      
+
+
       # End monte carlo bit
 
       # Make sure you take care of remote fp/fdp values on both sides
@@ -382,7 +415,7 @@ def process_ls49_image_real(tstamp='20180501143555114', #tstamp='201805011435593
             'mask': is_BAD_pixel, 'experiment':exp, 'indexed_reflections': R2, 'resolution': resolutions, 'cbf_imageset':cbf_imageset, 'panels':panels, 'fp_fdp':fp_fdp, 'fp_fdp_0':fp_fdp_0}
 
 
-def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None, seed=0.0, swap_spectra_timestamp=False):
+def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None, seed=0.0, swap_spectra_timestamp=False, n_macrocycles=5):
     from argparse import ArgumentParser
     from simtbx.diffBragg.refiners import RefineAll_JF1M_MultiPanel
     from simtbx.diffBragg.sim_data import SimData
@@ -423,7 +456,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
 
 
     # Define number of macrocycles and strategies
-    n_macrocycles=5
+    #n_macrocycles=5
     total_cycles=4*n_macrocycles
     ncells_strategy =           [True,  False,  False,   False ]*n_macrocycles # + [False, False]
     local_spotscale_strategy =  [False, False,  False,   False ]*n_macrocycles # + [False, False]
@@ -448,6 +481,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
       nbcryst_final.thick_mm = 0.005
       nbcryst_final.miller_array = data["sfall"]
       nbcryst_final.dxtbx_crystal = C
+      # miller_array.sym_equiv_indices(give it SG and HKL)
 
       SIM_jung = SimData()
       SIM_jung.crystal = nbcryst
@@ -611,6 +645,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
       show_pixel_values=False
       if show_plotted_images and n_cycle==total_cycles-1:
         import pylab as plt
+        dump_xy_for_paper=[]
         for i_spot in range(RUC.n_spots):
           fig, axs = plt.subplots(4,2)
           axs[0][0].imshow([[0, 1, 1], [0, 1, 2]])
@@ -676,6 +711,8 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
           axs[2][1].set_title('Observation')
           axs[3][1].set_title('Final difference image')
 
+          dump_xy_for_paper.append((x,y, vmin, vmax, x0, y0, vmin0, vmax0))
+
           plt.suptitle("Spot number = %d at %.2f resolution"%(i_spot,RUC.spot_resolution[i_spot]))
           if show_pixel_values:
             ds=3
@@ -690,6 +727,8 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
               for f in range(fmax-df, fmax+df):
                 text=axs[0][0].text(f,s, int(x0[s,f]), ha="center", va="center", color="w")
         plt.show()
+        from libtbx.easy_pickle import dump
+        dump('Fig5a_data_JF1M_nofpfdp_%s.pickle'%ts, dump_xy_for_paper)
 
       best=RUC.best_image
       C2 = deepcopy(C)
@@ -798,8 +837,12 @@ if __name__ == "__main__":
     import os, sys
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/out_jungfrau_shoeboxes2'
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_on_refinement_07May20/out_jungfrau_shoeboxes_v3'
-    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_after_fixing_twinning_24July20/out_jungfrau_shoeboxes_v2'
+    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_after_fixing_twinning_24July20/out_jungfrau_shoeboxes_v2'
+    # Work on 26Jan21
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_to_increase_lattices_12Jan21/out_jungfrau_shoeboxes_v3'
     ts='20180501114703722'
+    #ts='20180501171506915'
+    #ts='20180501151638379'
     #ts='20180501132216201'
     #ts='20180501120317142'
     # Debugging on 16 june regarding weird likelihood values
@@ -813,4 +856,4 @@ if __name__ == "__main__":
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None, seed=-1, swap_spectra_timestamp=False)
+    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None, seed=-40, swap_spectra_timestamp=False, n_macrocycles=5)

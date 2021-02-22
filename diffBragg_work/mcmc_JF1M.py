@@ -3,7 +3,7 @@
 #
 from load_ls49_JF1M import strong_spot_mask, process_ls49_image_real
 
-def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None, seed=0, short_circuit_dir=None, swap_spectra_timestamp=False):
+def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=False, outdir=None, params=None, seed=0, short_circuit_dir=None, swap_spectra_timestamp=False, n_macrocycles=5):
     from argparse import ArgumentParser
     from simtbx.diffBragg.refiners import RefineAll_JF1M_MultiPanel
     from simtbx.diffBragg.sim_data import SimData
@@ -43,10 +43,10 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
     indexed_reflections.as_file(os.path.join(outdir, 'before_refinement_%s.refl'%ts))
 
     # Some global variables here for LS49
-    mos_spread_deg=0.001
+    mos_spread_deg=0.001 # FIXME CHANGE THIS BACK TO 0.001
     n_mos_domains=1
     a,b,c,_,_,_ = C.get_unit_cell().parameters()
-    Deff = 1000
+    Deff = 1000 # FIXME CHANGE THIS BACK TO 1000
     Ncells_abc_0 = np.power(4/3*np.pi*Deff**3/a/b/c, 1/3.)
     C.set_domain_size_ang(Deff)
     C.set_half_mosaicity_deg(mos_spread_deg)
@@ -55,15 +55,15 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
 
 
     # Define number of macrocycles and strategies
-    n_macrocycles=5
+    #n_macrocycles=5
     total_cycles=3*n_macrocycles
-    ncells_strategy =           [True,  False, False, ]*n_macrocycles
-    local_spotscale_strategy =  [False, False, False,]*n_macrocycles
-    crystal_scale_strategy =    [True,  False, False,]*n_macrocycles
+    ncells_strategy =           [True,  False, False ]*n_macrocycles
+    local_spotscale_strategy =  [False, False, False]*n_macrocycles
+    crystal_scale_strategy =    [True,  False, False]*n_macrocycles
 
-    background_strategy =       [False, True,  False,]*n_macrocycles
-    umat_strategy =             [False, False, True, ]*n_macrocycles 
-    bmat_strategy =             [False, False, False,]*n_macrocycles 
+    background_strategy =       [False, True, False]*n_macrocycles
+    umat_strategy =             [False, False,True]*n_macrocycles 
+    bmat_strategy =             [False, False,False]*n_macrocycles 
 
     for n_cycle in range(total_cycles):
       print ('Refinement cycle %d for timestamp %s'%(n_cycle, ts))
@@ -75,7 +75,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
         init_local_spotscale = info['refined_local_spotscale']
         refined_local_spotscale = init_local_spotscale
 
-
+      
       Ncells_abc=refined_ncells # Setting it here for cycles not equal to 0
       nbcryst = nanoBragg_crystal.nanoBragg_crystal()
       nbcryst.Ncells_abc = Ncells_abc, Ncells_abc, Ncells_abc
@@ -195,6 +195,7 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
     ##########
 
       show_pixel_values=False
+      dump_xy_for_paper = []
       if show_plotted_images and n_cycle==total_cycles-1:
         import pylab as plt
         for i_spot in range(RUC.n_spots):
@@ -262,6 +263,9 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
           axs[2][1].set_title('Observation')
           axs[3][1].set_title('Final difference image')
 
+
+          dump_xy_for_paper.append((x,y, vmin, vmax, x0, y0, vmin0, vmax0))
+
           plt.suptitle("Spot number = %d at %.2f resolution"%(i_spot,RUC.spot_resolution[i_spot]))
           if show_pixel_values:
             ds=3
@@ -276,6 +280,9 @@ def run_all_refine_ls49_JF1M(ts=None, ls49_data_dir=None, show_plotted_images=Fa
               for f in range(fmax-df, fmax+df):
                 text=axs[0][0].text(f,s, int(x0[s,f]), ha="center", va="center", color="w")
         plt.show()
+        from libtbx.easy_pickle import dump
+        print ('Dumped data for figure 6b')
+        dump('Fig6b_data_JF1M_mcmc_%s.pickle'%ts, dump_xy_for_paper)
 
       best=RUC.best_image
       C2 = deepcopy(C)
@@ -344,8 +351,12 @@ if __name__ == "__main__":
     import os, sys
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/out_jungfrau_shoeboxes2'
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_on_refinement_07May20/out_jungfrau_shoeboxes_v3'
-    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_setup_before_scattering_factor/out_jungfrau_shoeboxes_v2'
+    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_setup_before_scattering_factor/out_jungfrau_shoeboxes_v2'
+    #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_after_fixing_twinning_24July20/out_jungfrau_shoeboxes_v2'
+    ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_work_to_increase_lattices_12Jan21/out_jungfrau_shoeboxes_v3'
     ts='20180501114703722'
+    #ts='20180501151638379'
+    #ts='20180501165223017'
     #ts='20180501132216201'
     #ts='20180501120317142'
     # Debugging on 16 june regarding weird likelihood values
@@ -359,4 +370,4 @@ if __name__ == "__main__":
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'
     #outdir=None
     #ls49_data_dir=None
-    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None, seed=3, short_circuit_dir=outdir, swap_spectra_timestamp=False)
+    run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=ls49_data_dir, outdir=outdir, show_plotted_images=True, params=None, seed=2, short_circuit_dir=outdir, swap_spectra_timestamp=False, n_macrocycles=5)

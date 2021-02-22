@@ -37,6 +37,9 @@ LS49_diffBragg_phil_str='''
     swap_spectra_timestamp = False
       .type = bool
       .help = If true, swap spectra of timestamp with another timestamp as read in from a pre-specified file
+    n_macrocycles = 5
+      .type = int
+      .help = Number of macrocycles refinement without the fp fdp added to structure factors 
 }
 '''
 #phil_scope = parse(LS49_diffBragg_phil_str)
@@ -134,8 +137,9 @@ class Script(object):
 
     ts = item_list[0] 
     print ('Inside do_work for rank %d'%rank)
+    print ('NMACRONCYCLES = %d'%self.params.LS49_diffBragg.n_macrocycles )
     t_start = time.time()
-    final_likelihood = run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.ls49_data_dir, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir, params=self.params, seed=self.params.LS49_diffBragg.seed, swap_spectra_timestamp=self.params.LS49_diffBragg.swap_spectra_timestamp)
+    final_likelihood = run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.ls49_data_dir, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir, params=self.params, seed=self.params.LS49_diffBragg.seed, swap_spectra_timestamp=self.params.LS49_diffBragg.swap_spectra_timestamp, n_macrocycles=self.params.LS49_diffBragg.n_macrocycles)
     t_end = time.time()
     delta_time = t_end - t_start
     print ('DiffBragg_LS49_timing %s  = %d'%(ts,delta_time))

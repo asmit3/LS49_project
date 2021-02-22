@@ -454,6 +454,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
 
       if show_plotted_images and n_cycle==total_cycles-1:
         import pylab as plt
+        # for paper
+        dump_xy_for_paper = []
         for i_spot in range(RUC.n_spots):
           fig, axs = plt.subplots(4,2)
           axs[0][0].imshow([[0, 1, 1], [0, 1, 2]])
@@ -473,6 +475,7 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
           y0 = RUC0.store_init_Imeas[i_spot]
           deltaI0 = np.abs(x0-y0)
           deltaI = np.abs(x-y)
+
         
           vmin = RUC.store_vmin[i_spot]
           vmax = RUC.store_vmax[i_spot]
@@ -519,6 +522,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
           axs[2][1].set_title('Observation')
           axs[3][1].set_title('Final difference image')
 
+          dump_xy_for_paper.append((x,y, vmin, vmax, x0, y0, vmin0, vmax0))
+
           plt.suptitle("Spot number = %d at %.2f resolution"%(i_spot,RUC.spot_resolution[i_spot]))
           if show_pixel_values:
             ds=3
@@ -533,6 +538,8 @@ def run_all_refine_ls49(ts=None, ls49_data_dir=None, show_plotted_images=False, 
               for f in range(fmax-df, fmax+df):
                 text=axs[0][0].text(f,s, int(x0[s,f]), ha="center", va="center", color="w")
         plt.show()
+        from libtbx.easy_pickle import dump
+        dump('Fig5a_data_%s.pickle'%ts, dump_xy_for_paper)
 
       C2 = deepcopy(C)
       if RUC.refine_Umatrix:
@@ -852,14 +859,20 @@ if __name__ == "__main__":
                               '20180501143652325', # curvature assertion error, looked good till then
                               '20180501143701853'] # Does not work
 
-    #ts = timestamps_of_interest[-2]
+    #ts = timestamps_of_interest[3]
+    #ts='20180501132216201'
+    #ts='20180501120317142'
+    #ts='20180501164500977'
+    #ts='20180501151638379'
+    ts='20180501165223017'
+    # Keep this as rayonix_expt even though the integrated expt/refls are in a different directory reindexed_rayonix
     ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
     # On cori here is the path
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
     #ls49_data_dir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/all_files/rayonix_expt'
     # On my Macbook Pro, here is the path
     #ls49_data_dir='/Users/abhowmick/Desktop/software/dials/modules/LS49_regression/diffBragg_work/jungfrau_grid_search_4_or_more_regression/rayonix_images_4_or_more_spots_r183_255'
-    ts='20180501114703722' # Image used in blog to compare on jungfrau
+    #ts='20180501114703722' # Image used in blog to compare on jungfrau
     #ts='20180501120317142'
     #ts='20180501163914779' # weird , low rotation change but blows up in prediction ?? !!
     outdir='/global/cscratch1/sd/asmit/LS49/LS49_SAD_v3/diffBragg_refinement/jungfrau_grid_search_4_or_more_regression/temp_2'

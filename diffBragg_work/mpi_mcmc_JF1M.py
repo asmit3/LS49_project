@@ -34,12 +34,18 @@ LS49_diffBragg_phil_str='''
     max_seed = 0
       .type = int
       .help = maximum seed value to do mcmc choosing fp/fdp displacement using random number with seed between 0 and max_seed  
+    sliding_Fe0_curve = False
+      .type = bool
+      .help = If True, slides the Fe0 curve along the energy axis. Done by using negative seeds
     short_circuit_dir = None
       .type = str
       .help = Directory for RUC_info_timestamp.pickle file
     swap_spectra_timestamp = False
       .type = bool
       .help = If true, swap spectra of timestamp with another timestamp as read in from a pre-specified file
+    n_macrocycles = 5
+      .type = int
+      .help = Number of macrocycles refinement with the f'/f'' added to structure factors 
 }
 '''
 #phil_scope = parse(LS49_diffBragg_phil_str)
@@ -102,6 +108,8 @@ class Script(object):
       # Define iterable here
       iterable = []
       seeds = range(1, self.params.LS49_diffBragg.max_seed+1) 
+      if self.params.LS49_diffBragg.sliding_Fe0_curve:
+        seeds = [-x for x in seeds] 
       for seed in seeds:
         for ts in all_timestamps:
           iterable.append((ts, seed))
@@ -145,7 +153,7 @@ class Script(object):
     print ('Send TYT', ts,seed)
     print ('Inside do_work for rank %d'%rank)
     t_start = time.time()
-    final_likelihood = run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.ls49_data_dir, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir, params=self.params, seed=seed, short_circuit_dir=self.params.LS49_diffBragg.short_circuit_dir, swap_spectra_timestamp=self.params.LS49_diffBragg.swap_spectra_timestamp)
+    final_likelihood = run_all_refine_ls49_JF1M(ts=ts, ls49_data_dir=self.params.LS49_diffBragg.ls49_data_dir, show_plotted_images=False, outdir=self.params.LS49_diffBragg.output_dir, params=self.params, seed=seed, short_circuit_dir=self.params.LS49_diffBragg.short_circuit_dir, swap_spectra_timestamp=self.params.LS49_diffBragg.swap_spectra_timestamp, n_macrocycles=self.params.LS49_diffBragg.n_macrocycles)
     t_end = time.time()
     delta_time = t_end - t_start
     print ('DiffBragg_LS49_timing %s  = %d'%(ts,delta_time))
